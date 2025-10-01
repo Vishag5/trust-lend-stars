@@ -170,7 +170,10 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold">Loan Requests ({requestsAsLender.length})</h2>
             {requestsAsLender.map((contract) => (
               <Card key={contract.id} className="p-4">
-                <div className="mb-3 flex items-start justify-between">
+                <div 
+                  className="mb-3 flex items-start justify-between cursor-pointer" 
+                  onClick={() => navigate(`/user/${contract.borrower_id}`)}
+                >
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
@@ -215,14 +218,20 @@ export default function Dashboard() {
                 <div className="flex gap-2">
                   <Button 
                     className="flex-1 bg-success hover:bg-success/90" 
-                    onClick={() => handleAccept(contract.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAccept(contract.id);
+                    }}
                   >
                     ✓ Accept
                   </Button>
                   <Button 
                     variant="ghost" 
                     className="flex-1" 
-                    onClick={() => handleReject(contract.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReject(contract.id);
+                    }}
                   >
                     ✕ Reject
                   </Button>
@@ -332,7 +341,7 @@ export default function Dashboard() {
         </Button>
 
         <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => navigate('/contracts')}>
+          <Button variant="outline" onClick={() => navigate('/search')}>
             <Search className="mr-2 h-4 w-4" />
             Search Profiles
           </Button>
@@ -393,17 +402,30 @@ export default function Dashboard() {
                   {contract.reason && (
                     <p className="mt-2 text-sm text-muted-foreground">{contract.reason}</p>
                   )}
-                  {contract.status === 'ACTIVE' && (
-                    <div className="mt-3 flex gap-2">
-                      <Button size="sm" variant="outline" className="flex-1">
-                        <Clock className="mr-2 h-4 w-4" />
-                        Ask for Time
-                      </Button>
-                      <Button size="sm" className="flex-1">
-                        Settle Up
-                      </Button>
-                    </div>
-                  )}
+                  <div className="mt-3 flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast({ title: 'Extension request sent' });
+                      }}
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      Ask for Time
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      className="flex-1 bg-success hover:bg-success/90"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast({ title: 'Settlement initiated' });
+                      }}
+                    >
+                      Settle Up
+                    </Button>
+                  </div>
                 </Card>
               ))}
             </div>

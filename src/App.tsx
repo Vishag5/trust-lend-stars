@@ -9,6 +9,8 @@ import CreateContract from "./pages/CreateContract";
 import ContractDetail from "./pages/ContractDetail";
 import Profile from "./pages/Profile";
 import Contracts from "./pages/Contracts";
+import UserProfile from "./pages/UserProfile";
+import SearchProfiles from "./pages/SearchProfiles";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/contract/:id" element={<ContractDetail />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/contracts" element={<Contracts />} />
+          <Route path="/user/:id" element={<UserProfile />} />
+          <Route path="/search" element={<SearchProfiles />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -10,9 +10,10 @@ interface ContractCardProps {
   contract: Contract;
   currentUserId: string;
   onUpdate: () => void;
+  showActions?: boolean;
 }
 
-export function ContractCard({ contract, currentUserId, onUpdate }: ContractCardProps) {
+export function ContractCard({ contract, currentUserId, onUpdate, showActions = false }: ContractCardProps) {
   const navigate = useNavigate();
   const isBorrower = contract.borrower_id === currentUserId;
   const isLender = contract.lender_id === currentUserId;
@@ -59,16 +60,27 @@ export function ContractCard({ contract, currentUserId, onUpdate }: ContractCard
           )}
         </div>
 
-        {contract.status === 'REQUESTED' && isLender && (
+        {showActions && isBorrower && (contract.status === 'ACTIVE' || contract.status === 'DUE') && (
           <div className="flex gap-2 pt-2">
-            <Button size="sm" variant="default" onClick={(e) => { e.stopPropagation(); navigate(`/contract/${contract.id}`); }}>
-              Accept
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="flex-1"
+              onClick={(e) => { 
+                e.stopPropagation(); 
+              }}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              Ask for Extension
             </Button>
-            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); }}>
-              Counter-offer
-            </Button>
-            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); }}>
-              Reject
+            <Button 
+              size="sm" 
+              className="flex-1 bg-success hover:bg-success/90"
+              onClick={(e) => { 
+                e.stopPropagation(); 
+              }}
+            >
+              Settle Up
             </Button>
           </div>
         )}
