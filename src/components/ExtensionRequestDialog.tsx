@@ -34,7 +34,9 @@ export function ExtensionRequestDialog({
   };
 
   const minDate = new Date(currentDueDate);
-  minDate.setDate(minDate.getDate() + 1);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const disabledDate = minDate > today ? minDate : today;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,9 +77,8 @@ export function ExtensionRequestDialog({
                   mode="single"
                   selected={selectedDate}
                   onSelect={setSelectedDate}
-                  disabled={(date) => date <= minDate}
+                  disabled={(date) => date < disabledDate}
                   initialFocus
-                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>

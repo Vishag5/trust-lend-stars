@@ -7,6 +7,7 @@ import { formatAmount, formatDateTime, formatPhone, getTimeUntilDue } from '@/li
 import { useNavigate } from 'react-router-dom';
 import { Clock, User, CheckCircle, XCircle } from 'lucide-react';
 import { ExtensionRequestDialog } from './ExtensionRequestDialog';
+import { ReviewDialog } from './ReviewDialog';
 import { useToast } from '@/hooks/use-toast';
 
 interface ContractCardProps {
@@ -19,6 +20,7 @@ export function ContractCard({ contract, currentUserId, onUpdate }: ContractCard
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showExtensionDialog, setShowExtensionDialog] = useState(false);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
   const isBorrower = contract.borrower_id === currentUserId;
   const isLender = contract.lender_id === currentUserId;
   const otherParty = isBorrower ? contract.lender : contract.borrower;
@@ -105,8 +107,27 @@ export function ContractCard({ contract, currentUserId, onUpdate }: ContractCard
       });
       toast({ title: 'Settlement approved!' });
       onUpdate();
+      // Open review dialog after settlement approval
+      setShowReviewDialog(true);
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to approve settlement', variant: 'destructive' });
+    }
+  };
+
+  const handleReviewSubmit = async (rating: number, reviewText: string) => {
+    try {
+      const client = getDataClient();
+      await client.createReview({
+        contract_id: contract.id,
+        reviewer_id: currentUserId,
+        reviewee_id: contract.borrower_id,
+        stars: rating,
+        text: reviewText,
+      });
+      toast({ title: 'Review submitted successfully!' });
+      onUpdate();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to submit review', variant: 'destructive' });
     }
   };
 
@@ -158,6 +179,12 @@ export function ContractCard({ contract, currentUserId, onUpdate }: ContractCard
               onOpenChange={setShowExtensionDialog}
               onSubmit={handleExtensionRequest}
               currentDueDate={contract.due_at}
+            />
+            <ReviewDialog
+              open={showReviewDialog}
+              onOpenChange={setShowReviewDialog}
+              onSubmit={handleReviewSubmit}
+              borrowerName={otherParty?.name || 'Unknown'}
             />
           </>
         );

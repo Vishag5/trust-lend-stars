@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Search, Phone, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { computeReliability } from '@/lib/reliability';
@@ -127,82 +127,62 @@ export default function SearchProfiles() {
           />
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="profiles" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="contracts">Contracts</TabsTrigger>
-            <TabsTrigger value="profiles">Profiles</TabsTrigger>
-          </TabsList>
+        {/* User Profiles */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">User Profiles</h2>
+            <span className="text-sm text-muted-foreground">{filteredUsers.length} found</span>
+          </div>
 
-          <TabsContent value="contracts" className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              View all your contracts in the "View Contracts" section
-            </p>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => navigate('/contracts')}
-            >
-              Go to Contracts
-            </Button>
-          </TabsContent>
+          {filteredUsers.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">No profiles found</p>
+            </Card>
+          ) : (
+            filteredUsers.map((user) => {
+              const userContracts = getUserContracts(user.id);
+              const completedCount = getCompletedCount(user.id);
+              const reliability = user.trust_reliability_cached || 0;
 
-          <TabsContent value="profiles" className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold">User Profiles</h2>
-              <span className="text-sm text-muted-foreground">{filteredUsers.length} found</span>
-            </div>
-
-            {filteredUsers.length === 0 ? (
-              <Card className="p-8 text-center">
-                <p className="text-muted-foreground">No profiles found</p>
-              </Card>
-            ) : (
-              filteredUsers.map((user) => {
-                const userContracts = getUserContracts(user.id);
-                const completedCount = getCompletedCount(user.id);
-                const reliability = user.trust_reliability_cached || 0;
-
-                return (
-                  <Card key={user.id} className="p-4">
-                    <div className="flex items-start gap-3 mb-3">
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{user.name}</h3>
-                        <div className="flex items-center text-xs">
-                          {renderStars(reliability)}
-                        </div>
+              return (
+                <Card key={user.id} className="p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <h3 className="font-semibold">{user.name}</h3>
+                      <div className="flex items-center text-xs">
+                        {renderStars(reliability)}
                       </div>
                     </div>
+                  </div>
 
-                    <div className="mb-3 text-sm">
-                      <p className="text-success mb-1">Completed</p>
-                      <p className="font-semibold text-success">{completedCount} contracts</p>
-                    </div>
+                  <div className="mb-3 text-sm">
+                    <p className="text-success mb-1">Completed</p>
+                    <p className="font-semibold text-success">{completedCount} contracts</p>
+                  </div>
 
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-                      <Phone className="h-4 w-4" />
-                      <span>{user.phone}</span>
-                    </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                    <Phone className="h-4 w-4" />
+                    <span>{user.phone}</span>
+                  </div>
 
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => navigate(`/user/${user.id}`)}
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      View Profile
-                    </Button>
-                  </Card>
-                );
-              })
-            )}
-          </TabsContent>
-        </Tabs>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => navigate(`/user/${user.id}`)}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Profile
+                  </Button>
+                </Card>
+              );
+            })
+          )}
+        </div>
       </main>
     </div>
   );
