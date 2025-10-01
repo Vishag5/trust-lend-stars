@@ -299,31 +299,80 @@ class MockDataClient implements DataClient {
   }
 }
 
-// Supabase implementation - placeholder for Live mode
+// Supabase implementation for Live mode
+import { supabase } from '@/integrations/supabase/client';
+
 class SupabaseDataClient implements DataClient {
-  // TODO: Implement with Supabase client when Live mode is enabled
   async getUserByPhone(phone: string): Promise<User | null> {
-    throw new Error('Supabase client not implemented yet');
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('phone', phone)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
   }
 
   async getUserById(id: string): Promise<User | null> {
-    throw new Error('Supabase client not implemented yet');
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
   }
 
   async createUser(data: { phone: string; name: string }): Promise<User> {
-    throw new Error('Supabase client not implemented yet');
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return user;
   }
 
   async updateUserReliability(userId: string, reliability: number): Promise<void> {
-    throw new Error('Supabase client not implemented yet');
+    const { error } = await supabase
+      .from('users')
+      .update({ trust_reliability_cached: reliability })
+      .eq('id', userId);
+    
+    if (error) throw error;
   }
 
   async getContractsForUser(userId: string): Promise<Contract[]> {
-    throw new Error('Supabase client not implemented yet');
+    const { data, error } = await supabase
+      .from('contracts')
+      .select(`
+        *,
+        borrower:borrower_id(id, phone, name, trust_reliability_cached, created_at),
+        lender:lender_id(id, phone, name, trust_reliability_cached, created_at)
+      `)
+      .or(`borrower_id.eq.${userId},lender_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data as Contract[];
   }
 
   async getContractById(id: string): Promise<Contract | null> {
-    throw new Error('Supabase client not implemented yet');
+    const { data, error } = await supabase
+      .from('contracts')
+      .select(`
+        *,
+        borrower:borrower_id(id, phone, name, trust_reliability_cached, created_at),
+        lender:lender_id(id, phone, name, trust_reliability_cached, created_at)
+      `)
+      .eq('id', id)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data as Contract | null;
   }
 
   async createContract(data: {
@@ -333,30 +382,77 @@ class SupabaseDataClient implements DataClient {
     due_at: string;
     reason: string | null;
   }): Promise<Contract> {
-    throw new Error('Supabase client not implemented yet');
+    const { data: contract, error } = await supabase
+      .from('contracts')
+      .insert({ ...data, status: 'REQUESTED' })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return contract;
   }
 
   async updateContract(id: string, data: Partial<Contract>): Promise<Contract> {
-    throw new Error('Supabase client not implemented yet');
+    const { data: contract, error } = await supabase
+      .from('contracts')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return contract;
   }
 
   async getExtensionsForContract(contractId: string): Promise<Extension[]> {
-    throw new Error('Supabase client not implemented yet');
+    const { data, error } = await supabase
+      .from('extensions')
+      .select('*')
+      .eq('contract_id', contractId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
   }
 
   async createExtension(data: {
     contract_id: string;
     new_due_at: string;
   }): Promise<Extension> {
-    throw new Error('Supabase client not implemented yet');
+    const { data: extension, error } = await supabase
+      .from('extensions')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return extension;
   }
 
   async approveExtension(id: string, approved: boolean): Promise<Extension> {
-    throw new Error('Supabase client not implemented yet');
+    const { data: extension, error } = await supabase
+      .from('extensions')
+      .update({ approved, decided_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return extension;
   }
 
   async getReviewsForUser(userId: string): Promise<Review[]> {
-    throw new Error('Supabase client not implemented yet');
+    const { data, error } = await supabase
+      .from('reviews')
+      .select(`
+        *,
+        reviewer:reviewer_id(id, phone, name, trust_reliability_cached, created_at)
+      `)
+      .eq('reviewee_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data as Review[];
   }
 
   async createReview(data: {
@@ -366,15 +462,37 @@ class SupabaseDataClient implements DataClient {
     stars: number;
     text: string | null;
   }): Promise<Review> {
-    throw new Error('Supabase client not implemented yet');
+    const { data: review, error } = await supabase
+      .from('reviews')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return review;
   }
 
   async markReviewResolved(id: string): Promise<Review> {
-    throw new Error('Supabase client not implemented yet');
+    const { data: review, error } = await supabase
+      .from('reviews')
+      .update({ resolved: true })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return review;
   }
 
   async getRemindersForContract(contractId: string): Promise<Reminder[]> {
-    throw new Error('Supabase client not implemented yet');
+    const { data, error } = await supabase
+      .from('reminders')
+      .select('*')
+      .eq('contract_id', contractId)
+      .order('scheduled_at', { ascending: true });
+    
+    if (error) throw error;
+    return data;
   }
 
   async createReminder(data: {
@@ -382,11 +500,23 @@ class SupabaseDataClient implements DataClient {
     kind: string;
     scheduled_at: string;
   }): Promise<Reminder> {
-    throw new Error('Supabase client not implemented yet');
+    const { data: reminder, error } = await supabase
+      .from('reminders')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return reminder;
   }
 
   async markReminderSent(id: string): Promise<void> {
-    throw new Error('Supabase client not implemented yet');
+    const { error } = await supabase
+      .from('reminders')
+      .update({ sent_at: new Date().toISOString() })
+      .eq('id', id);
+    
+    if (error) throw error;
   }
 }
 
