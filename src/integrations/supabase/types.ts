@@ -14,7 +14,212 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contracts: {
+        Row: {
+          amount: number
+          borrower_id: string
+          created_at: string
+          disbursal_proof_url: string | null
+          due_at: string
+          id: string
+          lender_id: string
+          reason: string | null
+          repayment_proof_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          borrower_id: string
+          created_at?: string
+          disbursal_proof_url?: string | null
+          due_at: string
+          id?: string
+          lender_id: string
+          reason?: string | null
+          repayment_proof_url?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          borrower_id?: string
+          created_at?: string
+          disbursal_proof_url?: string | null
+          due_at?: string
+          id?: string
+          lender_id?: string
+          reason?: string | null
+          repayment_proof_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_borrower_id_fkey"
+            columns: ["borrower_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_lender_id_fkey"
+            columns: ["lender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extensions: {
+        Row: {
+          approved: boolean | null
+          contract_id: string
+          created_at: string
+          decided_at: string | null
+          id: string
+          new_due_at: string
+        }
+        Insert: {
+          approved?: boolean | null
+          contract_id: string
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          new_due_at: string
+        }
+        Update: {
+          approved?: boolean | null
+          contract_id?: string
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          new_due_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extensions_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reminders: {
+        Row: {
+          contract_id: string
+          created_at: string
+          id: string
+          kind: string
+          scheduled_at: string
+          sent_at: string | null
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          scheduled_at: string
+          sent_at?: string | null
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          scheduled_at?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          contract_id: string
+          created_at: string
+          id: string
+          resolved: boolean
+          reviewee_id: string
+          reviewer_id: string
+          stars: number
+          text: string | null
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          id?: string
+          resolved?: boolean
+          reviewee_id: string
+          reviewer_id: string
+          stars: number
+          text?: string | null
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          id?: string
+          resolved?: boolean
+          reviewee_id?: string
+          reviewer_id?: string
+          stars?: number
+          text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewee_id_fkey"
+            columns: ["reviewee_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          phone: string
+          trust_reliability_cached: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          phone: string
+          trust_reliability_cached?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string
+          trust_reliability_cached?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
