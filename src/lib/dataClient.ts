@@ -32,6 +32,7 @@ export interface Extension {
   id: string;
   contract_id: string;
   new_due_at: string;
+  reason?: string | null;
   approved: boolean | null;
   decided_at: string | null;
   created_at: string;
@@ -83,6 +84,7 @@ export interface DataClient {
   createExtension(data: {
     contract_id: string;
     new_due_at: string;
+    reason?: string | null;
     extra_days?: number;
   }): Promise<Extension>;
   approveExtension(id: string, approved: boolean): Promise<Extension>;
@@ -230,7 +232,7 @@ class MockDataClient implements DataClient {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  async createExtension(data: { contract_id: string; new_due_at: string; extra_days?: number }): Promise<Extension> {
+  async createExtension(data: { contract_id: string; new_due_at: string; reason?: string | null; extra_days?: number }): Promise<Extension> {
     const extensions = this.getStore<Extension>('extensions');
     const extension: Extension = {
       id: crypto.randomUUID(),

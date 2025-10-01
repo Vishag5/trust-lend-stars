@@ -286,6 +286,11 @@ export default function Dashboard() {
                     <p className="text-muted-foreground">
                       {contract.borrower?.name} is asking for {extension.extra_days || 5} additional days to repay the loan.
                     </p>
+                    {extension.reason && (
+                      <p className="mt-2 text-sm">
+                        <span className="font-medium">Reason:</span> {extension.reason}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex gap-2">

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { computeReliability } from '@/lib/reliability';
+import { ContractCard } from '@/components/ContractCard';
 
 export default function UserProfile() {
   const { id } = useParams<{ id: string }>();
@@ -176,20 +177,22 @@ export default function UserProfile() {
           <TabsContent value="contracts" className="space-y-3">
             {contracts.length === 0 ? (
               <Card className="p-8 text-center">
-                <div className="text-6xl mb-4">📈</div>
-                <p className="text-muted-foreground mb-2">Contract history would appear here</p>
-                <p className="text-sm text-muted-foreground">
-                  {completionRate} of {contracts.length} contracts completed
-                </p>
+                <p className="text-muted-foreground">No contracts yet</p>
               </Card>
             ) : (
-              <Card className="p-8 text-center">
-                <div className="text-6xl mb-4">📈</div>
-                <p className="text-muted-foreground mb-2">Contract history would appear here</p>
-                <p className="text-sm text-muted-foreground">
+              <>
+                <div className="mb-2 text-sm text-muted-foreground">
                   {completionRate} of {contracts.length} contracts completed
-                </p>
-              </Card>
+                </div>
+                {contracts.map((contract) => (
+                  <ContractCard
+                    key={contract.id}
+                    contract={contract}
+                    currentUserId={currentUserId!}
+                    onUpdate={loadUserData}
+                  />
+                ))}
+              </>
             )}
           </TabsContent>
         </Tabs>

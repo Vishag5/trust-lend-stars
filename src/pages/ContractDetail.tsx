@@ -107,7 +107,6 @@ export default function ContractDetail() {
             {contract.status === 'REQUESTED' && isLender && (
               <div className="flex gap-2 pt-4">
                 <Button onClick={handleAccept}>Accept & Upload Proof</Button>
-                <Button variant="outline">Counter-offer</Button>
                 <Button variant="ghost">Reject</Button>
               </div>
             )}
@@ -115,7 +114,7 @@ export default function ContractDetail() {
             {contract.status === 'ACTIVE' && isBorrower && (
               <div className="flex gap-2 pt-4">
                 <Button>Settle Up</Button>
-                <Button variant="outline">Ask for Time</Button>
+                <Button variant="outline">Ask for Extension</Button>
               </div>
             )}
           </CardContent>
