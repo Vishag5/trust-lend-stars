@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getDataClient, Contract } from '@/lib/dataClient';
 import { MobileHeader } from '@/components/MobileHeader';
-import { MobileNav } from '@/components/MobileNav';
 import { ContractCard } from '@/components/ContractCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -44,11 +43,10 @@ export default function Contracts() {
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col">
-        <MobileHeader />
-        <main className="flex flex-1 items-center justify-center pb-20">
+        <MobileHeader title="Contracts" showBack />
+        <main className="flex flex-1 items-center justify-center">
           <p className="text-muted-foreground">Loading...</p>
         </main>
-        <MobileNav />
       </div>
     );
   }
@@ -59,9 +57,9 @@ export default function Contracts() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <MobileHeader />
+      <MobileHeader title="Contracts" showBack />
       
-      <main className="flex-1 px-4 py-6 pb-20">
+      <main className="flex-1 px-4 py-6">
         <h1 className="mb-4 text-2xl font-bold">Contracts</h1>
 
         <Tabs defaultValue="all" className="space-y-4">
@@ -117,8 +115,6 @@ export default function Contracts() {
           </TabsContent>
         </Tabs>
       </main>
-
-      <MobileNav />
     </div>
   );
 }

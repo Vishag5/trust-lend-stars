@@ -9,11 +9,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuthStore } from '@/store/authStore';
 import { getDataClient } from '@/lib/dataClient';
 import { DEMO_USERS } from '@/lib/seedData';
 import { useToast } from '@/hooks/use-toast';
-import { User, Check } from 'lucide-react';
+import { User, Check, Menu } from 'lucide-react';
 
 export function UserSwitcher() {
   const navigate = useNavigate();
@@ -51,12 +52,15 @@ export function UserSwitcher() {
     }
   };
 
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm">
-          <User className="mr-2 h-4 w-4" />
-          Switch User
+        <Button size="icon" className="h-10 w-10 rounded-full bg-success hover:bg-success/90">
+          <Menu className="h-5 w-5 text-white" />
         </Button>
       </SheetTrigger>
       <SheetContent side="bottom" className="rounded-t-2xl">
@@ -73,7 +77,11 @@ export function UserSwitcher() {
               onClick={() => handleUserSelect(user.phone, user.name)}
             >
               <div className="flex items-center gap-3">
-                <User className="h-5 w-5" />
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                    {getInitials(user.name)}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="text-left">
                   <div className="font-semibold">{user.name}</div>
                   <div className="text-xs opacity-80">{user.phone}</div>

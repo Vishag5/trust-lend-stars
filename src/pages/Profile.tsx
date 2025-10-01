@@ -7,7 +7,6 @@ import { getDataClient, Review } from '@/lib/dataClient';
 import { computeReliability, ReliabilityData } from '@/lib/reliability';
 import { ReliabilityStars } from '@/components/ReliabilityStars';
 import { MobileHeader } from '@/components/MobileHeader';
-import { MobileNav } from '@/components/MobileNav';
 import { LogOut, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -62,11 +61,10 @@ export default function Profile() {
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col">
-        <MobileHeader />
-        <main className="flex flex-1 items-center justify-center pb-20">
+        <MobileHeader title="Profile" showBack />
+        <main className="flex flex-1 items-center justify-center">
           <p className="text-muted-foreground">Loading...</p>
         </main>
-        <MobileNav />
       </div>
     );
   }
@@ -76,9 +74,9 @@ export default function Profile() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <MobileHeader />
+      <MobileHeader title="Profile" showBack />
       
-      <main className="flex-1 space-y-4 px-4 py-6 pb-20">
+      <main className="flex-1 space-y-4 px-4 py-6">
         {/* User Info Card */}
         <Card className="p-6">
           <div className="space-y-4">
@@ -190,8 +188,6 @@ export default function Profile() {
           Logout
         </Button>
       </main>
-
-      <MobileNav />
     </div>
   );
 }

@@ -3,163 +3,270 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { MobileHeader } from '@/components/MobileHeader';
 import { useAuthStore } from '@/store/authStore';
 import { getDataClient } from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft } from 'lucide-react';
+import { FileText, Upload } from 'lucide-react';
 
 export default function CreateContract() {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-
+  
+  const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
-  const [lenderPhone, setLenderPhone] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [dueTime, setDueTime] = useState('');
   const [reason, setReason] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!currentUserId) {
-      toast({ title: 'Error', description: 'Not logged in', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'Please log in first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validation
+    if (!phone || !amount || !dueDate) {
+      toast({
+        title: 'Missing information',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
       return;
     }
 
     const amountNum = parseFloat(amount);
-    if (amountNum < 100) {
-      toast({ title: 'Invalid amount', description: 'Minimum amount is ₹100', variant: 'destructive' });
+    if (isNaN(amountNum) || amountNum < 100) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Amount must be at least ₹100',
+        variant: 'destructive',
+      });
       return;
     }
 
-    const dueDateTime = new Date(`${dueDate}T${dueTime}`);
-    const minDue = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    const maxDue = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-
-    if (dueDateTime < minDue) {
-      toast({ title: 'Invalid due date', description: 'Due date must be at least 48 hours from now', variant: 'destructive' });
+    // Check due date is at least 48 hours from now
+    const due = new Date(dueDate);
+    const minDate = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const maxDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    
+    if (due < minDate) {
+      toast({
+        title: 'Invalid due date',
+        description: 'Due date must be at least 48 hours from now',
+        variant: 'destructive',
+      });
       return;
     }
 
-    if (dueDateTime > maxDue) {
-      toast({ title: 'Invalid due date', description: 'Due date cannot exceed 90 days', variant: 'destructive' });
-      return;
-    }
-
-    if (!/^\+91\d{10}$/.test(lenderPhone.replace(/\s/g, ''))) {
-      toast({ title: 'Invalid phone', description: 'Phone must be in format +91XXXXXXXXXX', variant: 'destructive' });
+    if (due > maxDate) {
+      toast({
+        title: 'Invalid due date',
+        description: 'Due date must be within 90 days',
+        variant: 'destructive',
+      });
       return;
     }
 
     setLoading(true);
     try {
       const client = getDataClient();
-      const lender = await client.getUserByPhone(lenderPhone.replace(/\s/g, ''));
-
+      
+      // Find lender by phone
+      const lender = await client.getUserByPhone(phone.replace(/\s/g, ''));
       if (!lender) {
-        toast({ title: 'Lender not found', description: 'No user found with this phone number', variant: 'destructive' });
+        toast({
+          title: 'Lender not found',
+          description: 'No user found with this phone number. Would you like to invite them?',
+          variant: 'destructive',
+        });
         setLoading(false);
         return;
       }
 
+      // Create contract
       await client.createContract({
         borrower_id: currentUserId,
         lender_id: lender.id,
         amount: amountNum,
-        due_at: dueDateTime.toISOString(),
+        due_at: due.toISOString(),
         reason: reason || null,
       });
 
-      toast({ title: 'Request created', description: 'Your loan request has been sent' });
+      toast({
+        title: 'Loan request sent!',
+        description: 'The lender will receive a notification to review your request',
+      });
+      
       navigate('/dashboard');
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to create contract', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'Failed to create loan request',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
-      </header>
+    <div className="flex min-h-screen flex-col bg-muted/30">
+      <MobileHeader title="Request Loan" showBack />
+      
+      <main className="flex-1 px-4 py-6">
+        <Card className="p-6">
+          <div className="mb-6 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Loan Request Details</h2>
+          </div>
 
-      <main className="container mx-auto max-w-2xl px-4 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Loan Request</CardTitle>
-            <CardDescription>Request money from a trusted lender</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Lender Information */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold uppercase text-muted-foreground">
+                Lender Information
+              </h3>
+              
               <div className="space-y-2">
-                <label className="text-sm font-medium">Amount (₹)</label>
+                <Label htmlFor="phone">Lender's Phone Number *</Label>
                 <Input
-                  type="number"
-                  placeholder="Minimum ₹100"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  min="100"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Lender Phone Number</label>
-                <Input
+                  id="phone"
                   type="tel"
-                  placeholder="+91 90000 22222"
-                  value={lenderPhone}
-                  onChange={(e) => setLenderPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  disabled={loading}
                   required
                 />
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Due Date</label>
+            {/* Loan Details */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold uppercase text-muted-foreground">
+                Loan Details
+              </h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount (INR) *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    ₹
+                  </span>
                   <Input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    id="amount"
+                    type="number"
+                    placeholder="5000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    disabled={loading}
+                    className="pl-8"
                     required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Due Time</label>
-                  <Input
-                    type="time"
-                    value={dueTime}
-                    onChange={(e) => setDueTime(e.target.value)}
-                    required
+                    min="100"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Reason (Optional)</label>
-                <Textarea
-                  placeholder="Why do you need this loan?"
+                <Label htmlFor="reason">Reason for Loan</Label>
+                <Input
+                  id="reason"
+                  type="text"
+                  placeholder="e.g., Emergency medical expense"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  rows={3}
+                  disabled={loading}
                 />
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading ? 'Creating...' : 'Send Request'}
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">Repayment Date *</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum 30 days from today
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Additional Notes</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Any additional terms or notes..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  disabled={loading}
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Help your lender understand your situation
+                </p>
+              </div>
+            </div>
+
+            {/* Attach Proof */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold uppercase text-muted-foreground">
+                Attach Proof (Optional)
+              </h3>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full"
+                disabled={loading}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Receipt or Document
               </Button>
-            </form>
-          </CardContent>
+              <p className="text-xs text-muted-foreground">
+                Add any receipts, agreements, or supporting documents
+              </p>
+            </div>
+
+            {/* Submit Buttons */}
+            <div className="space-y-3 pt-4">
+              <Button 
+                type="submit" 
+                className="w-full bg-success hover:bg-success/90" 
+                size="lg"
+                disabled={loading}
+              >
+                {loading ? 'Sending...' : 'Send Loan Request'}
+              </Button>
+              
+              <Button 
+                type="button" 
+                variant="ghost" 
+                className="w-full"
+                onClick={() => navigate('/dashboard')}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+            </div>
+
+            <p className="text-center text-xs text-muted-foreground">
+              The lender will receive a notification to review your request
+            </p>
+          </form>
         </Card>
       </main>
     </div>
