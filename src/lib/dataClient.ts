@@ -350,14 +350,14 @@ class SupabaseDataClient implements DataClient {
       .from('contracts')
       .select(`
         *,
-        borrower:borrower_id(id, phone, name, trust_reliability_cached, created_at),
-        lender:lender_id(id, phone, name, trust_reliability_cached, created_at)
+        borrower:users!contracts_borrower_id_fkey(id, phone, name, trust_reliability_cached, created_at),
+        lender:users!contracts_lender_id_fkey(id, phone, name, trust_reliability_cached, created_at)
       `)
       .or(`borrower_id.eq.${userId},lender_id.eq.${userId}`)
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data as Contract[];
+    return data as unknown as Contract[];
   }
 
   async getContractById(id: string): Promise<Contract | null> {
@@ -365,14 +365,14 @@ class SupabaseDataClient implements DataClient {
       .from('contracts')
       .select(`
         *,
-        borrower:borrower_id(id, phone, name, trust_reliability_cached, created_at),
-        lender:lender_id(id, phone, name, trust_reliability_cached, created_at)
+        borrower:users!contracts_borrower_id_fkey(id, phone, name, trust_reliability_cached, created_at),
+        lender:users!contracts_lender_id_fkey(id, phone, name, trust_reliability_cached, created_at)
       `)
       .eq('id', id)
       .maybeSingle();
     
     if (error) throw error;
-    return data as Contract | null;
+    return data as unknown as Contract | null;
   }
 
   async createContract(data: {
@@ -389,7 +389,7 @@ class SupabaseDataClient implements DataClient {
       .single();
     
     if (error) throw error;
-    return contract;
+    return contract as unknown as Contract;
   }
 
   async updateContract(id: string, data: Partial<Contract>): Promise<Contract> {
@@ -401,7 +401,7 @@ class SupabaseDataClient implements DataClient {
       .single();
     
     if (error) throw error;
-    return contract;
+    return contract as unknown as Contract;
   }
 
   async getExtensionsForContract(contractId: string): Promise<Extension[]> {
@@ -446,13 +446,13 @@ class SupabaseDataClient implements DataClient {
       .from('reviews')
       .select(`
         *,
-        reviewer:reviewer_id(id, phone, name, trust_reliability_cached, created_at)
+        reviewer:users!reviews_reviewer_id_fkey(id, phone, name, trust_reliability_cached, created_at)
       `)
       .eq('reviewee_id', userId)
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data as Review[];
+    return data as unknown as Review[];
   }
 
   async createReview(data: {
