@@ -9,8 +9,9 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   const variants: Record<ContractStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
     REQUESTED: { variant: 'secondary', label: 'Requested' },
     ACTIVE: { variant: 'default', label: 'Active' },
-    SETTLE_PENDING: { variant: 'outline', label: 'Settle Pending' },
+    DUE: { variant: 'destructive', label: 'Due' },
     SETTLED: { variant: 'outline', label: 'Settled' },
+    REJECTED: { variant: 'destructive', label: 'Rejected' },
   };
 
   const { variant, label } = variants[status];

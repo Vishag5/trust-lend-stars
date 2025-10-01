@@ -17,10 +17,10 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 47% 11%;
 
-    /* Trust blue - primary brand color */
-    --primary: 217 91% 60%;
+    /* Trust Green - primary brand color */
+    --primary: 145 77% 45%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 217 91% 55%;
+    --primary-hover: 145 77% 40%;
 
     /* Soft gray backgrounds */
     --secondary: 214 32% 91%;
@@ -72,9 +72,9 @@ All colors MUST be HSL.
     --popover: 224 71% 4%;
     --popover-foreground: 213 31% 91%;
 
-    --primary: 217 91% 60%;
+    --primary: 145 77% 45%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 217 91% 65%;
+    --primary-hover: 145 77% 50%;
 
     --secondary: 222 47% 11%;
     --secondary-foreground: 213 31% 91%;

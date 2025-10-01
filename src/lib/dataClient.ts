@@ -1,6 +1,6 @@
 // Data client factory - switches between mock (Demo) and Supabase (Live) based on DEMO_MODE env
 
-export type ContractStatus = 'REQUESTED' | 'ACTIVE' | 'SETTLE_PENDING' | 'SETTLED';
+export type ContractStatus = 'REQUESTED' | 'ACTIVE' | 'DUE' | 'SETTLED' | 'REJECTED';
 
 export interface User {
   id: string;
@@ -24,6 +24,8 @@ export interface Contract {
   lender?: User;
   disbursal_proof_url?: string | null;
   repayment_proof_url?: string | null;
+  settlement_pending?: boolean;
+  extensions_count?: number;
 }
 
 export interface Extension {
@@ -33,6 +35,7 @@ export interface Extension {
   approved: boolean | null;
   decided_at: string | null;
   created_at: string;
+  extra_days?: number;
 }
 
 export interface Review {
@@ -61,6 +64,7 @@ export interface DataClient {
   getUserById(id: string): Promise<User | null>;
   createUser(data: { phone: string; name: string }): Promise<User>;
   updateUserReliability(userId: string, reliability: number): Promise<void>;
+  getAllUsers(): Promise<User[]>;
   
   // Contracts
   getContractsForUser(userId: string): Promise<Contract[]>;
@@ -79,6 +83,7 @@ export interface DataClient {
   createExtension(data: {
     contract_id: string;
     new_due_at: string;
+    extra_days?: number;
   }): Promise<Extension>;
   approveExtension(id: string, approved: boolean): Promise<Extension>;
   
@@ -147,27 +152,44 @@ class MockDataClient implements DataClient {
     }
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return this.getStore<User>('users');
+  }
+
   async getContractsForUser(userId: string): Promise<Contract[]> {
     const contracts = this.getStore<Contract>('contracts');
     const users = this.getStore<User>('users');
+    const extensions = this.getStore<Extension>('extensions');
+    
     return contracts
       .filter(c => c.borrower_id === userId || c.lender_id === userId)
-      .map(c => ({
-        ...c,
-        borrower: users.find(u => u.id === c.borrower_id),
-        lender: users.find(u => u.id === c.lender_id),
-      }));
+      .map(c => {
+        const extensionsCount = extensions.filter(e => e.contract_id === c.id && e.approved === true).length;
+        return {
+          ...c,
+          borrower: users.find(u => u.id === c.borrower_id),
+          lender: users.find(u => u.id === c.lender_id),
+          extensions_count: extensionsCount,
+        };
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   async getContractById(id: string): Promise<Contract | null> {
     const contracts = this.getStore<Contract>('contracts');
     const users = this.getStore<User>('users');
+    const extensions = this.getStore<Extension>('extensions');
     const contract = contracts.find(c => c.id === id);
+    
     if (!contract) return null;
+    
+    const extensionsCount = extensions.filter(e => e.contract_id === id && e.approved === true).length;
+    
     return {
       ...contract,
       borrower: users.find(u => u.id === contract.borrower_id),
       lender: users.find(u => u.id === contract.lender_id),
+      extensions_count: extensionsCount,
     };
   }
 
@@ -185,6 +207,7 @@ class MockDataClient implements DataClient {
       status: 'REQUESTED',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      extensions_count: 0,
     };
     contracts.push(contract);
     this.setStore('contracts', contracts);
@@ -202,10 +225,12 @@ class MockDataClient implements DataClient {
 
   async getExtensionsForContract(contractId: string): Promise<Extension[]> {
     const extensions = this.getStore<Extension>('extensions');
-    return extensions.filter(e => e.contract_id === contractId);
+    return extensions
+      .filter(e => e.contract_id === contractId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  async createExtension(data: { contract_id: string; new_due_at: string }): Promise<Extension> {
+  async createExtension(data: { contract_id: string; new_due_at: string; extra_days?: number }): Promise<Extension> {
     const extensions = this.getStore<Extension>('extensions');
     const extension: Extension = {
       id: crypto.randomUUID(),
@@ -226,6 +251,19 @@ class MockDataClient implements DataClient {
     extensions[index].approved = approved;
     extensions[index].decided_at = new Date().toISOString();
     this.setStore('extensions', extensions);
+    
+    // If approved, update contract due date
+    if (approved) {
+      const extension = extensions[index];
+      const contracts = this.getStore<Contract>('contracts');
+      const contractIndex = contracts.findIndex(c => c.id === extension.contract_id);
+      if (contractIndex !== -1) {
+        contracts[contractIndex].due_at = extension.new_due_at;
+        contracts[contractIndex].updated_at = new Date().toISOString();
+        this.setStore('contracts', contracts);
+      }
+    }
+    
     return extensions[index];
   }
 
@@ -237,7 +275,8 @@ class MockDataClient implements DataClient {
       .map(r => ({
         ...r,
         reviewer: users.find(u => u.id === r.reviewer_id),
-      }));
+      }))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   async createReview(data: {
@@ -299,229 +338,7 @@ class MockDataClient implements DataClient {
   }
 }
 
-// Supabase implementation for Live mode
-import { supabase } from '@/integrations/supabase/client';
-
-class SupabaseDataClient implements DataClient {
-  async getUserByPhone(phone: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('phone', phone)
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
-  }
-
-  async getUserById(id: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
-  }
-
-  async createUser(data: { phone: string; name: string }): Promise<User> {
-    const { data: user, error } = await supabase
-      .from('users')
-      .insert(data)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return user;
-  }
-
-  async updateUserReliability(userId: string, reliability: number): Promise<void> {
-    const { error } = await supabase
-      .from('users')
-      .update({ trust_reliability_cached: reliability })
-      .eq('id', userId);
-    
-    if (error) throw error;
-  }
-
-  async getContractsForUser(userId: string): Promise<Contract[]> {
-    const { data, error } = await supabase
-      .from('contracts')
-      .select(`
-        *,
-        borrower:users!contracts_borrower_id_fkey(id, phone, name, trust_reliability_cached, created_at),
-        lender:users!contracts_lender_id_fkey(id, phone, name, trust_reliability_cached, created_at)
-      `)
-      .or(`borrower_id.eq.${userId},lender_id.eq.${userId}`)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data as unknown as Contract[];
-  }
-
-  async getContractById(id: string): Promise<Contract | null> {
-    const { data, error } = await supabase
-      .from('contracts')
-      .select(`
-        *,
-        borrower:users!contracts_borrower_id_fkey(id, phone, name, trust_reliability_cached, created_at),
-        lender:users!contracts_lender_id_fkey(id, phone, name, trust_reliability_cached, created_at)
-      `)
-      .eq('id', id)
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data as unknown as Contract | null;
-  }
-
-  async createContract(data: {
-    borrower_id: string;
-    lender_id: string;
-    amount: number;
-    due_at: string;
-    reason: string | null;
-  }): Promise<Contract> {
-    const { data: contract, error } = await supabase
-      .from('contracts')
-      .insert({ ...data, status: 'REQUESTED' })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return contract as unknown as Contract;
-  }
-
-  async updateContract(id: string, data: Partial<Contract>): Promise<Contract> {
-    const { data: contract, error } = await supabase
-      .from('contracts')
-      .update(data)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return contract as unknown as Contract;
-  }
-
-  async getExtensionsForContract(contractId: string): Promise<Extension[]> {
-    const { data, error } = await supabase
-      .from('extensions')
-      .select('*')
-      .eq('contract_id', contractId)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data;
-  }
-
-  async createExtension(data: {
-    contract_id: string;
-    new_due_at: string;
-  }): Promise<Extension> {
-    const { data: extension, error } = await supabase
-      .from('extensions')
-      .insert(data)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return extension;
-  }
-
-  async approveExtension(id: string, approved: boolean): Promise<Extension> {
-    const { data: extension, error } = await supabase
-      .from('extensions')
-      .update({ approved, decided_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return extension;
-  }
-
-  async getReviewsForUser(userId: string): Promise<Review[]> {
-    const { data, error } = await supabase
-      .from('reviews')
-      .select(`
-        *,
-        reviewer:users!reviews_reviewer_id_fkey(id, phone, name, trust_reliability_cached, created_at)
-      `)
-      .eq('reviewee_id', userId)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data as unknown as Review[];
-  }
-
-  async createReview(data: {
-    contract_id: string;
-    reviewer_id: string;
-    reviewee_id: string;
-    stars: number;
-    text: string | null;
-  }): Promise<Review> {
-    const { data: review, error } = await supabase
-      .from('reviews')
-      .insert(data)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return review;
-  }
-
-  async markReviewResolved(id: string): Promise<Review> {
-    const { data: review, error } = await supabase
-      .from('reviews')
-      .update({ resolved: true })
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return review;
-  }
-
-  async getRemindersForContract(contractId: string): Promise<Reminder[]> {
-    const { data, error } = await supabase
-      .from('reminders')
-      .select('*')
-      .eq('contract_id', contractId)
-      .order('scheduled_at', { ascending: true });
-    
-    if (error) throw error;
-    return data;
-  }
-
-  async createReminder(data: {
-    contract_id: string;
-    kind: string;
-    scheduled_at: string;
-  }): Promise<Reminder> {
-    const { data: reminder, error } = await supabase
-      .from('reminders')
-      .insert(data)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return reminder;
-  }
-
-  async markReminderSent(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('reminders')
-      .update({ sent_at: new Date().toISOString() })
-      .eq('id', id);
-    
-    if (error) throw error;
-  }
-}
-
-// Factory function
+// Factory function - always returns mock for demo
 export function getDataClient(): DataClient {
-  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
-  return isDemoMode ? new MockDataClient() : new SupabaseDataClient();
+  return new MockDataClient();
 }

@@ -1,110 +1,105 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import { getDataClient } from '@/lib/dataClient';
-import { QA_USERS, seedDemoData } from '@/lib/seedData';
-import { Handshake } from 'lucide-react';
+import { seedDemoData, DEMO_USERS } from '@/lib/seedData';
 import { useToast } from '@/hooks/use-toast';
-
-const isQAMode = import.meta.env.VITE_QA_MODE === 'true';
+import { User } from 'lucide-react';
 
 export default function Login() {
-  const [phone, setPhone] = useState('');
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
+  const { currentUser, setCurrentUser } = useAuthStore();
   const { toast } = useToast();
 
-  const handleLogin = async (phoneNumber: string) => {
-    setLoading(true);
-    try {
-      // Seed demo data if needed
-      await seedDemoData();
+  useEffect(() => {
+    // Seed demo data on first load
+    seedDemoData();
 
-      const client = getDataClient();
-      let user = await client.getUserByPhone(phoneNumber);
-
-      if (!user) {
-        toast({
-          title: 'User not found',
-          description: 'No account found with this phone number',
-          variant: 'destructive',
-        });
-        setLoading(false);
-        return;
-      }
-
-      setCurrentUser({ id: user.id, name: user.name, phone: user.phone });
+    // If already logged in, go to dashboard
+    if (currentUser) {
       navigate('/dashboard');
+    }
+  }, [currentUser, navigate]);
+
+  const handleUserSelect = async (phone: string, name: string) => {
+    try {
+      const client = getDataClient();
+      const user = await client.getUserByPhone(phone);
+      
+      if (user) {
+        setCurrentUser(user);
+        toast({
+          title: `Welcome, ${name}!`,
+          description: `Logged in as ${phone}`,
+        });
+        navigate('/dashboard');
+      }
     } catch (error) {
       toast({
-        title: 'Login failed',
-        description: 'An error occurred during login',
+        title: 'Error',
+        description: 'Failed to select user',
         variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleQuickLogin = (qaUser: typeof QA_USERS[keyof typeof QA_USERS]) => {
-    handleLogin(qaUser.phone);
-  };
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-background p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <Handshake className="h-8 w-8 text-primary" />
-          </div>
-          <CardTitle className="text-3xl font-bold">LenTrust</CardTitle>
-          <CardDescription className="text-base">
-            Peer-to-peer lending with accountability
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isQAMode && (
-            <div className="space-y-2 rounded-lg border border-warning bg-warning-light p-4">
-              <p className="text-sm font-semibold text-warning-foreground">QA Quick Login</p>
-              <div className="space-y-2">
-                {Object.values(QA_USERS).map((qaUser) => (
-                  <Button
-                    key={qaUser.phone}
-                    onClick={() => handleQuickLogin(qaUser)}
-                    disabled={loading}
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    {qaUser.name} — {qaUser.phone}
-                  </Button>
-                ))}
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-background px-4">
+      <Card className="w-full max-w-md space-y-6 p-8">
+        <div className="text-center">
+          <h1 className="mb-2 text-4xl font-bold text-primary">LenTrust</h1>
+          <p className="text-muted-foreground">Peer-to-peer lending with accountability</p>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-center text-sm text-muted-foreground">
+            Select a demo user to continue
+          </p>
+
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 h-auto py-4"
+              onClick={() => handleUserSelect(DEMO_USERS.BORROWER_A.phone, DEMO_USERS.BORROWER_A.name)}
+            >
+              <User className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">{DEMO_USERS.BORROWER_A.name}</div>
+                <div className="text-xs text-muted-foreground">{DEMO_USERS.BORROWER_A.phone}</div>
               </div>
-            </div>
-          )}
+            </Button>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Phone Number</label>
-            <Input
-              type="tel"
-              placeholder="+91 90000 11111"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={loading}
-            />
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 h-auto py-4"
+              onClick={() => handleUserSelect(DEMO_USERS.BORROWER_B.phone, DEMO_USERS.BORROWER_B.name)}
+            >
+              <User className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">{DEMO_USERS.BORROWER_B.name}</div>
+                <div className="text-xs text-muted-foreground">{DEMO_USERS.BORROWER_B.phone}</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 h-auto py-4"
+              onClick={() => handleUserSelect(DEMO_USERS.LENDER_L1.phone, DEMO_USERS.LENDER_L1.name)}
+            >
+              <User className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">{DEMO_USERS.LENDER_L1.name}</div>
+                <div className="text-xs text-muted-foreground">{DEMO_USERS.LENDER_L1.phone}</div>
+              </div>
+            </Button>
           </div>
+        </div>
 
-          <Button
-            onClick={() => handleLogin(phone)}
-            disabled={loading || !phone}
-            className="w-full"
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </Button>
-        </CardContent>
+        <p className="text-center text-xs text-muted-foreground">
+          Demo app • All data is stored locally
+        </p>
       </Card>
     </div>
   );

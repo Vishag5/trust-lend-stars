@@ -1,4 +1,4 @@
-import { Contract, Review, getDataClient } from './dataClient';
+import { getDataClient } from './dataClient';
 
 export interface ReliabilityData {
   percentage: number;
@@ -9,81 +9,105 @@ export interface ReliabilityData {
   isNew: boolean;
 }
 
+/**
+ * Compute reliability score based on 12-month contract history
+ * Formula: (on-time + ≤7-day late + resolved-after-negative) / (all settled + currently overdue/unresolved) × 100
+ * 
+ * Stars mapping:
+ * 90-100 → ★★★★★
+ * 75-89  → ★★★★☆
+ * 60-74  → ★★★☆☆
+ * 40-59  → ★★☆☆☆
+ * 0-39   → ★☆☆☆☆
+ * 
+ * If fewer than 2 completed contracts in last 12 months → "New — no history yet"
+ */
 export async function computeReliability(userId: string): Promise<ReliabilityData> {
   const client = getDataClient();
   const contracts = await client.getContractsForUser(userId);
   const reviews = await client.getReviewsForUser(userId);
-
-  // Filter contracts where user is borrower, settled in last 12 months
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-
+  
+  const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  
+  // Filter contracts where user is borrower and within 12 months
   const borrowerContracts = contracts.filter(
-    (c) => c.borrower_id === userId && new Date(c.created_at) >= twelveMonthsAgo
+    c => c.borrower_id === userId && new Date(c.created_at).getTime() > twelveMonthsAgo
   );
-
-  const settledContracts = borrowerContracts.filter((c) => c.status === 'SETTLED');
-  const unresolvedNegatives = reviews.filter((r) => r.stars <= 2 && !r.resolved).length;
-
-  // If fewer than 2 completed contracts, show "New"
-  if (settledContracts.length + unresolvedNegatives < 2) {
+  
+  // Get completed contracts (SETTLED or currently overdue/unresolved)
+  const settledContracts = borrowerContracts.filter(c => c.status === 'SETTLED');
+  const overdueContracts = borrowerContracts.filter(c => {
+    if (c.status !== 'ACTIVE' && c.status !== 'DUE') return false;
+    return new Date(c.due_at).getTime() < Date.now();
+  });
+  
+  const completedCount = settledContracts.length + overdueContracts.length;
+  
+  // If fewer than 2 completed contracts, return "New"
+  if (completedCount < 2) {
     return {
       percentage: 0,
       stars: 0,
-      label: 'New — no history yet',
+      label: 'New',
       numerator: 0,
-      denominator: 0,
+      denominator: completedCount,
       isNew: true,
     };
   }
-
-  // Count on-time, late (≤7 days), and resolved negatives
-  let onTime = 0;
-  let lateButWithin7Days = 0;
-  let resolvedAfterNegative = 0;
-
-  settledContracts.forEach((c) => {
-    const dueDate = new Date(c.due_at);
-    const settledDate = new Date(c.updated_at);
-    const diffDays = Math.floor((settledDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 0) {
-      onTime++;
-    } else if (diffDays <= 7) {
-      lateButWithin7Days++;
+  
+  let goodCount = 0;
+  
+  // Count on-time and ≤7-day late settlements
+  for (const contract of settledContracts) {
+    const dueDate = new Date(contract.due_at).getTime();
+    const settledDate = new Date(contract.updated_at).getTime(); // Assume updated_at is settlement date
+    const daysLate = Math.floor((settledDate - dueDate) / (24 * 60 * 60 * 1000));
+    
+    if (daysLate <= 7) {
+      goodCount++;
     }
-
-    // Check if there was a negative review that got resolved
-    const negativeResolved = reviews.some(
-      (r) => r.contract_id === c.id && r.stars <= 2 && r.resolved
-    );
-    if (negativeResolved) {
-      resolvedAfterNegative++;
-    }
-  });
-
-  const numerator = onTime + lateButWithin7Days + resolvedAfterNegative;
-  const denominator = settledContracts.length + unresolvedNegatives;
-  const percentage = denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
-
-  let stars = 1;
-  if (percentage >= 90) stars = 5;
-  else if (percentage >= 75) stars = 4;
-  else if (percentage >= 60) stars = 3;
-  else if (percentage >= 40) stars = 2;
-
+  }
+  
+  // Count resolved negative reviews (payment after negative review)
+  const negativeReviews = reviews.filter(r => r.stars < 3);
+  const resolvedNegatives = negativeReviews.filter(r => r.resolved).length;
+  goodCount += resolvedNegatives;
+  
+  const percentage = Math.round((goodCount / completedCount) * 100);
+  
+  // Map to stars
+  let stars: number;
+  let label: string;
+  
+  if (percentage >= 90) {
+    stars = 5;
+    label = 'Excellent';
+  } else if (percentage >= 75) {
+    stars = 4;
+    label = 'Very Good';
+  } else if (percentage >= 60) {
+    stars = 3;
+    label = 'Good';
+  } else if (percentage >= 40) {
+    stars = 2;
+    label = 'Fair';
+  } else {
+    stars = 1;
+    label = 'Poor';
+  }
+  
   return {
     percentage,
     stars,
-    label: `${percentage}%`,
-    numerator,
-    denominator,
+    label,
+    numerator: goodCount,
+    denominator: completedCount,
     isNew: false,
   };
 }
 
 export async function updateUserReliability(userId: string): Promise<void> {
+  const data = await computeReliability(userId);
   const client = getDataClient();
-  const reliabilityData = await computeReliability(userId);
-  await client.updateUserReliability(userId, reliabilityData.percentage);
+  await client.updateUserReliability(userId, data.percentage);
 }
