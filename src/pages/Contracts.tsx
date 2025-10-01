@@ -103,7 +103,6 @@ export default function Contracts() {
                   contract={contract}
                   currentUserId={currentUserId!}
                   onUpdate={loadContracts}
-                  showActions={true}
                 />
               ))
             )}
