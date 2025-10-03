@@ -1,0 +1,37 @@
+[
+  {
+  "id": "lenTrust_e2e",
+  "title": "LenTrust Frontend E2E",
+  "description": "Covers login, dashboard actions, create contract date/time, settle proof, invite dialog.",
+  "base_url": "http://localhost:8080",
+  "steps": [
+    { "type": "visit", "path": "/" },
+    { "type": "click", "selector": "text=Borrower A" },
+    { "type": "assert-visible", "selector": "text=Create New Contract" },
+
+    { "type": "click", "selector": "text=Ask for Time", "optional": true },
+    { "type": "assert-visible", "selector": "text=Request Extension", "optional": true },
+    { "type": "close-dialog", "optional": true },
+
+    { "type": "visit", "path": "/create-contract" },
+    { "type": "type", "selector": "input#phone", "value": "+919000022222" },
+    { "type": "type", "selector": "input#amount", "value": "1200" },
+    { "type": "click", "selector": "#dueDateBtn" },
+    { "type": "pick-date", "value": "+7d" },
+    { "type": "click", "selector": "#repay-time" },
+    { "type": "type", "selector": "#repay-time", "value": "12:30" },
+    { "type": "assert-visible", "selector": "text=Send Loan Request" },
+
+    { "type": "visit", "path": "/dashboard" },
+    { "type": "click", "selector": "text=Invite Friends" },
+    { "type": "assert-visible", "selector": "text=Invite Friends to LenTrust" },
+
+    { "type": "click", "selector": "text=Settle Up", "optional": true },
+    { "type": "upload", "selector": "#repay-proof", "value": "public/placeholder.svg", "optional": true },
+    { "type": "click", "selector": "text=Submit", "optional": true },
+    { "type": "assert-visible", "selector": "text=Awaiting Approval", "optional": true }
+  ]
+  }
+]
+
+

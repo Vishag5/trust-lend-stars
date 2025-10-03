@@ -6,12 +6,16 @@ import { useAuthStore } from '@/store/authStore';
 import { getDataClient, Contract, Extension } from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
 import { MobileHeader } from '@/components/MobileHeader';
-import { Plus, Search, FileText, Clock, User, Calendar, IndianRupee } from 'lucide-react';
+import { ExtensionRequestDialog } from '@/components/ExtensionRequestDialog';
+import { SettleUpDialog } from '@/components/SettleUpDialog';
+import { ProofViewerDialog } from '@/components/ProofViewerDialog';
+import { Plus, Search, FileText, Clock, User, Calendar, IndianRupee, Share2 } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ReliabilityStars } from '@/components/ReliabilityStars';
 import { computeReliability } from '@/lib/reliability';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
+import { InviteDialog } from '@/components/InviteDialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -20,6 +24,11 @@ export default function Dashboard() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showExtensionDialog, setShowExtensionDialog] = useState(false);
+  const [showSettleDialog, setShowSettleDialog] = useState(false);
+  const [activeContract, setActiveContract] = useState<Contract | null>(null);
+  const [showProofDialog, setShowProofDialog] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -100,6 +109,44 @@ export default function Dashboard() {
         description: 'Failed to process extension',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleExtensionSubmit = async (newDueDate: Date, reason: string) => {
+    if (!activeContract) return;
+    try {
+      const client = getDataClient();
+      const extraDays = Math.ceil((newDueDate.getTime() - new Date(activeContract.due_at).getTime()) / (1000 * 60 * 60 * 24));
+      await client.createExtension({
+        contract_id: activeContract.id,
+        new_due_at: newDueDate.toISOString(),
+        reason,
+        extra_days: extraDays,
+      });
+      setShowExtensionDialog(false);
+      setActiveContract(null);
+      toast({ title: 'Extension request sent' });
+      loadData();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to send extension request', variant: 'destructive' });
+    }
+  };
+
+  const handleSettleUpload = async (proofUrl: string) => {
+    if (!activeContract) return;
+    try {
+      const client = getDataClient();
+      await client.updateContract(activeContract.id, {
+        status: 'DUE',
+        repayment_proof_url: proofUrl,
+        settlement_pending: true,
+      });
+      setShowSettleDialog(false);
+      setActiveContract(null);
+      toast({ title: 'Settlement proof uploaded. Awaiting lender approval.' });
+      loadData();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to upload proof', variant: 'destructive' });
     }
   };
 
@@ -345,14 +392,16 @@ export default function Dashboard() {
           Create New Contract
         </Button>
 
+        {/* Invite removed here; use top-right header button instead */}
+
         <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => navigate('/search')}>
-            <Search className="mr-2 h-4 w-4" />
-            Search Profiles
-          </Button>
           <Button variant="outline" onClick={() => navigate('/contracts')}>
             <FileText className="mr-2 h-4 w-4" />
             View Contracts
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/search')}>
+            <Search className="mr-2 h-4 w-4" />
+            Search Profiles
           </Button>
         </div>
 
@@ -408,28 +457,51 @@ export default function Dashboard() {
                     <p className="mt-2 text-sm text-muted-foreground">{contract.reason}</p>
                   )}
                   <div className="mt-3 flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="flex-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast({ title: 'Extension request sent' });
-                      }}
-                    >
-                      <Clock className="mr-2 h-4 w-4" />
-                      Ask for Time
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      className="flex-1 bg-success hover:bg-success/90"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast({ title: 'Settlement initiated' });
-                      }}
-                    >
-                      Settle Up
-                    </Button>
+                    {contract.extension_pending ? (
+                      <Button size="sm" variant="outline" className="flex-1">
+                        Pending Time Approval
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveContract(contract);
+                          setShowExtensionDialog(true);
+                        }}
+                      >
+                        <Clock className="mr-2 h-4 w-4" />
+                        Ask for Time
+                      </Button>
+                    )}
+                    {contract.settlement_pending ? (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveContract(contract);
+                          setShowProofDialog(true);
+                        }}
+                      >
+                        Awaiting Approval
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        className="flex-1 bg-success hover:bg-success/90"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveContract(contract);
+                          setShowSettleDialog(true);
+                        }}
+                      >
+                        Settle Up
+                      </Button>
+                    )}
                   </div>
                 </Card>
               ))}
@@ -482,22 +554,48 @@ export default function Dashboard() {
                   {contract.reason && (
                     <p className="mt-2 text-sm text-muted-foreground">{contract.reason}</p>
                   )}
-                  {isOverdue(contract.due_at) && (
-                    <div className="mt-3 flex gap-2">
-                      <Button size="sm" variant="outline" className="flex-1">
-                        Send Reminder
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1">
+                      Send Reminder
+                    </Button>
+                        {(contract.settlement_pending || contract.repayment_proof_url) ? (
+                      <Button size="sm" className="bg-success hover:bg-success/90 flex-1" onClick={(e) => { e.stopPropagation(); setActiveContract(contract); setShowProofDialog(true); }}>
+                        Review Proof
                       </Button>
-                      <Button size="sm" className="bg-primary hover:bg-primary/90 flex-1">
-                        Mark Settled
+                    ) : (
+                      <Button size="sm" className="bg-primary hover:bg-primary/90 flex-1" onClick={(e) => { e.stopPropagation(); navigate(`/contract/${contract.id}`); }}>
+                        Awaiting Proof
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </Card>
               ))}
             </div>
           )}
         </div>
       </main>
+      {/* Global dialogs for borrower actions */}
+      {activeContract && (
+        <>
+          <ExtensionRequestDialog
+            open={showExtensionDialog}
+            onOpenChange={(open) => { setShowExtensionDialog(open); if (!open) setActiveContract(null); }}
+            onSubmit={handleExtensionSubmit}
+            currentDueDate={activeContract.due_at}
+          />
+          <SettleUpDialog
+            open={showSettleDialog}
+            onOpenChange={(open) => { setShowSettleDialog(open); if (!open) setActiveContract(null); }}
+            onUpload={handleSettleUpload}
+          />
+          <ProofViewerDialog
+            open={showProofDialog}
+            onOpenChange={(open) => { setShowProofDialog(open); if (!open) setActiveContract(null); }}
+            imageUrl={activeContract.repayment_proof_url || activeContract.disbursal_proof_url}
+          />
+        </>
+      )}
+      <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>
   );
 }

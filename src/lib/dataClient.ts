@@ -26,6 +26,7 @@ export interface Contract {
   repayment_proof_url?: string | null;
   settlement_pending?: boolean;
   extensions_count?: number;
+  extension_pending?: boolean;
 }
 
 export interface Extension {
@@ -243,6 +244,13 @@ class MockDataClient implements DataClient {
     };
     extensions.push(extension);
     this.setStore('extensions', extensions);
+    // Mark contract as having a pending extension
+    const contracts = this.getStore<Contract>('contracts');
+    const cIdx = contracts.findIndex(c => c.id === data.contract_id);
+    if (cIdx !== -1) {
+      contracts[cIdx].extension_pending = true;
+      this.setStore('contracts', contracts);
+    }
     return extension;
   }
 
@@ -262,6 +270,17 @@ class MockDataClient implements DataClient {
       if (contractIndex !== -1) {
         contracts[contractIndex].due_at = extension.new_due_at;
         contracts[contractIndex].updated_at = new Date().toISOString();
+        contracts[contractIndex].extension_pending = false;
+        this.setStore('contracts', contracts);
+      }
+    }
+    // If rejected, also clear pending flag
+    if (!approved) {
+      const extension = extensions[index];
+      const contracts = this.getStore<Contract>('contracts');
+      const contractIndex = contracts.findIndex(c => c.id === extension.contract_id);
+      if (contractIndex !== -1) {
+        contracts[contractIndex].extension_pending = false;
         this.setStore('contracts', contracts);
       }
     }

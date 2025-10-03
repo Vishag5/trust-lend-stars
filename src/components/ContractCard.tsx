@@ -7,6 +7,8 @@ import { formatAmount, formatDateTime, formatPhone, getTimeUntilDue } from '@/li
 import { useNavigate } from 'react-router-dom';
 import { Clock, User, CheckCircle, XCircle } from 'lucide-react';
 import { ExtensionRequestDialog } from './ExtensionRequestDialog';
+import { SettleUpDialog } from './SettleUpDialog';
+import { ProofViewerDialog } from './ProofViewerDialog';
 import { ReviewDialog } from './ReviewDialog';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,6 +23,8 @@ export function ContractCard({ contract, currentUserId, onUpdate }: ContractCard
   const { toast } = useToast();
   const [showExtensionDialog, setShowExtensionDialog] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [showSettleDialog, setShowSettleDialog] = useState(false);
+  const [showProofDialog, setShowProofDialog] = useState(false);
   const isBorrower = contract.borrower_id === currentUserId;
   const isLender = contract.lender_id === currentUserId;
   const otherParty = isBorrower ? contract.lender : contract.borrower;
@@ -54,19 +58,18 @@ export function ContractCard({ contract, currentUserId, onUpdate }: ContractCard
     }
   };
 
-  const handleSettleUp = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleSettleUpload = async (proofUrl: string) => {
     try {
       const client = getDataClient();
       await client.updateContract(contract.id, { 
-        status: 'SETTLED',
-        repayment_proof_url: 'mock://proof.jpg',
+        status: 'DUE',
+        repayment_proof_url: proofUrl,
         settlement_pending: true 
       });
       toast({ title: 'Settlement proof uploaded. Awaiting lender approval.' });
       onUpdate();
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to settle up', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to upload proof', variant: 'destructive' });
     }
   };
 
@@ -154,31 +157,62 @@ export function ContractCard({ contract, currentUserId, onUpdate }: ContractCard
         return (
           <>
             <div className="flex gap-2 pt-2">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="flex-1"
-                onClick={(e) => { 
-                  e.stopPropagation();
-                  setShowExtensionDialog(true);
-                }}
-              >
-                <Clock className="mr-2 h-4 w-4" />
-                Ask for Extension
-              </Button>
-              <Button 
-                size="sm" 
-                className="flex-1 bg-success hover:bg-success/90"
-                onClick={handleSettleUp}
-              >
-                Settle Up
-              </Button>
+              {contract.extension_pending ? (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex-1"
+                >
+                  Pending Time Approval
+                </Button>
+              ) : (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={(e) => { 
+                    e.stopPropagation();
+                    setShowExtensionDialog(true);
+                  }}
+                >
+                  <Clock className="mr-2 h-4 w-4" />
+                  Ask for Extension
+                </Button>
+              )}
+              {contract.settlement_pending ? (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="flex-1"
+                  onClick={(e) => { e.stopPropagation(); setShowProofDialog(true); }}
+                >
+                  Awaiting Approval
+                </Button>
+              ) : (
+                <Button 
+                  size="sm" 
+                  className="flex-1 bg-success hover:bg-success/90"
+                  onClick={(e) => { e.stopPropagation(); setShowSettleDialog(true); }}
+                >
+                  Settle Up
+                </Button>
+              )}
             </div>
             <ExtensionRequestDialog
               open={showExtensionDialog}
               onOpenChange={setShowExtensionDialog}
               onSubmit={handleExtensionRequest}
               currentDueDate={contract.due_at}
+            />
+            <SettleUpDialog
+              open={showSettleDialog}
+              onOpenChange={setShowSettleDialog}
+              onUpload={handleSettleUpload}
+            />
+            <ProofViewerDialog
+              open={showProofDialog}
+              onOpenChange={setShowProofDialog}
+              imageUrl={contract.repayment_proof_url || contract.disbursal_proof_url}
             />
             <ReviewDialog
               open={showReviewDialog}
@@ -270,9 +304,14 @@ export function ContractCard({ contract, currentUserId, onUpdate }: ContractCard
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-3xl font-bold text-primary">{formatAmount(contract.amount)}</span>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>{getTimeUntilDue(contract.due_at)}</span>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {contract.settlement_pending && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800 text-xs font-medium">Awaiting approval</span>
+            )}
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span>{getTimeUntilDue(contract.due_at)}</span>
+            </div>
           </div>
         </div>
         

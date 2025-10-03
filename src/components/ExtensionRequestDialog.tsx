@@ -24,12 +24,22 @@ export function ExtensionRequestDialog({
 }: ExtensionRequestDialogProps) {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [reason, setReason] = useState('');
+  const [time, setTime] = useState(''); // HH:MM
+  const [suppressBlur, setSuppressBlur] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+  const timeInputRef = useState<HTMLInputElement | null>(null)[0];
 
   const handleSubmit = () => {
     if (!selectedDate) return;
-    onSubmit(selectedDate, reason);
+    // Merge selected date with chosen time if provided
+    const dateWithTime = new Date(selectedDate);
+    if (!time) return;
+    const [hh, mm] = time.split(':').map((v) => parseInt(v, 10));
+    dateWithTime.setHours(hh || 0, mm || 0, 0, 0);
+    onSubmit(dateWithTime, reason);
     setSelectedDate(undefined);
     setReason('');
+    setTime('');
     onOpenChange(false);
   };
 
@@ -58,7 +68,7 @@ export function ExtensionRequestDialog({
 
           <div className="space-y-2">
             <Label htmlFor="new-date">New Due Date *</Label>
-            <Popover>
+            <Popover open={dateOpen} onOpenChange={setDateOpen}>
               <PopoverTrigger asChild>
                 <Button
                   id="new-date"
@@ -76,12 +86,57 @@ export function ExtensionRequestDialog({
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={setSelectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    // Auto close the calendar after selecting a date and focus time
+                    setDateOpen(false);
+                    setTimeout(() => {
+                      const input = document.getElementById('new-time') as HTMLInputElement | null;
+                      input?.focus();
+                    }, 0);
+                  }}
                   disabled={(date) => date < disabledDate}
                   initialFocus
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="new-time">Time *</Label>
+            <div
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm cursor-text"
+              onClick={() => {
+                const input = document.getElementById('new-time') as HTMLInputElement | null;
+                setSuppressBlur(true);
+                input?.showPicker?.();
+                input?.focus();
+              }}
+            >
+              <input
+                id="new-time"
+                type="time"
+                value={time}
+                onFocus={() => setSuppressBlur(true)}
+                onChange={(e) => {
+                  setTime(e.target.value);
+                  // Close after a short delay to allow minute AM/PM selection on some UIs
+                  setTimeout(() => {
+                    setSuppressBlur(false);
+                    (e.target as HTMLInputElement).blur();
+                  }, 150);
+                }}
+                onBlur={(e) => {
+                  if (suppressBlur) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    (e.target as HTMLInputElement).focus();
+                  }
+                }}
+                className="w-full bg-transparent outline-none"
+                required
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -102,7 +157,7 @@ export function ExtensionRequestDialog({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!selectedDate || !reason.trim()}
+            disabled={!selectedDate || !time || !reason.trim()}
           >
             Submit Request
           </Button>

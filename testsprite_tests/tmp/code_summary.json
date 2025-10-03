@@ -1,0 +1,111 @@
+{
+  "tech_stack": [
+    "TypeScript",
+    "React",
+    "Vite",
+    "Zustand",
+    "TailwindCSS",
+    "shadcn/ui",
+    "TanStack Query",
+    "LocalStorage (mock data client)",
+    "date-fns"
+  ],
+  "features": [
+    {
+      "name": "App Routing",
+      "description": "SPA routing across login, dashboard, contracts, create, contract detail, profile, search, user profile, not found.",
+      "files": [
+        "src/App.tsx"
+      ]
+    },
+    {
+      "name": "Auth Store",
+      "description": "Zustand store for current user and logout.",
+      "files": [
+        "src/store/authStore.ts"
+      ]
+    },
+    {
+      "name": "Mock Data Client",
+      "description": "LocalStorage-backed client for users, contracts, extensions, reviews, reminders.",
+      "files": [
+        "src/lib/dataClient.ts",
+        "src/lib/seedData.ts"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Overview with loan requests, extension requests, active metrics, actions, and borrower/lender sections.",
+      "files": [
+        "src/pages/Dashboard.tsx"
+      ]
+    },
+    {
+      "name": "Create Contract",
+      "description": "Form to request a loan with lender phone, amount, reason, date+time pickers.",
+      "files": [
+        "src/pages/CreateContract.tsx"
+      ]
+    },
+    {
+      "name": "Contract Detail",
+      "description": "Detailed view with Accept/Reject (lender), Ask for Extension/Settle Up (borrower), proof viewer.",
+      "files": [
+        "src/pages/ContractDetail.tsx"
+      ]
+    },
+    {
+      "name": "Contracts List",
+      "description": "Tabbed list of all, active, settled with reusable ContractCard actions.",
+      "files": [
+        "src/pages/Contracts.tsx",
+        "src/components/ContractCard.tsx"
+      ]
+    },
+    {
+      "name": "Profiles and Search",
+      "description": "User profile, search connected profiles, user profile view with stats and reviews.",
+      "files": [
+        "src/pages/Profile.tsx",
+        "src/pages/SearchProfiles.tsx",
+        "src/pages/UserProfile.tsx"
+      ]
+    },
+    {
+      "name": "Extension Request Dialog",
+      "description": "Choose new due date and time with reason; required; auto-close behaviors.",
+      "files": [
+        "src/components/ExtensionRequestDialog.tsx"
+      ]
+    },
+    {
+      "name": "Settle Up & Proof Viewer",
+      "description": "Dialog to upload repayment proof (data URL) and viewer to display proof to both parties.",
+      "files": [
+        "src/components/SettleUpDialog.tsx",
+        "src/components/ProofViewerDialog.tsx"
+      ]
+    },
+    {
+      "name": "Invite Friends",
+      "description": "Header invite opens multi-platform share dialog with copy link.",
+      "files": [
+        "src/components/MobileHeader.tsx",
+        "src/components/InviteDialog.tsx"
+      ]
+    },
+    {
+      "name": "UI & Utilities",
+      "description": "UI primitives, status badges, reliability stars, formatters.",
+      "files": [
+        "src/components/ui/*",
+        "src/components/StatusBadge.tsx",
+        "src/components/ReliabilityStars.tsx",
+        "src/lib/format.ts",
+        "src/lib/reliability.ts"
+      ]
+    }
+  ]
+}
+
+

@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { UserSwitcher } from './UserSwitcher';
 import { Share2, ArrowLeft, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { InviteDialog } from '@/components/InviteDialog';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface MobileHeaderProps {
@@ -15,16 +17,10 @@ export function MobileHeader({ title, showBack = false }: MobileHeaderProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const handleInvite = () => {
-    if (currentUser) {
-      const inviteLink = `${window.location.origin}?ref=${encodeURIComponent(currentUser.phone)}`;
-      navigator.clipboard.writeText(inviteLink);
-      toast({
-        title: 'Invite link copied!',
-        description: 'Share this link so they can receive your request on LenTrust.',
-      });
-    }
+    setInviteOpen(true);
   };
 
   const handleBack = () => {
@@ -67,6 +63,7 @@ export function MobileHeader({ title, showBack = false }: MobileHeaderProps) {
           <UserSwitcher />
         </div>
       </div>
+      <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
     </header>
   );
 }

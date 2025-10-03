@@ -9,17 +9,24 @@ import { MobileHeader } from '@/components/MobileHeader';
 import { useAuthStore } from '@/store/authStore';
 import { getDataClient } from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Upload } from 'lucide-react';
+import { FileText, Upload, Calendar as CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 export default function CreateContract() {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
   const { toast } = useToast();
   
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+91 ');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState<string>(''); // deprecated, kept for fallback
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [time, setTime] = useState('');
+  const [dateOpen, setDateOpen] = useState(false);
+  const [suppressBlur, setSuppressBlur] = useState(false);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -36,7 +43,7 @@ export default function CreateContract() {
     }
 
     // Validation
-    if (!phone || !amount || !dueDate) {
+    if (!phone || !amount || !selectedDate || !time) {
       toast({
         title: 'Missing information',
         description: 'Please fill in all required fields',
@@ -55,8 +62,12 @@ export default function CreateContract() {
       return;
     }
 
+    // Build due datetime from selected date + time
+    const due = new Date(selectedDate);
+    const [hh, mm] = time.split(':').map((v) => parseInt(v, 10));
+    due.setHours(hh || 0, mm || 0, 0, 0);
+
     // Check due date is at least 48 hours from now
-    const due = new Date(dueDate);
     const minDate = new Date(Date.now() + 48 * 60 * 60 * 1000);
     const maxDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
     
@@ -191,17 +202,73 @@ export default function CreateContract() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="dueDate">Repayment Date *</Label>
-                <Input
-                  id="dueDate"
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  disabled={loading}
-                  required
-                />
+                <Label htmlFor="dueDateBtn">Repayment Date *</Label>
+                <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="dueDateBtn"
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        'w-full justify-start text-left font-normal',
+                        !selectedDate && 'text-muted-foreground'
+                      )}
+                      onClick={() => setDateOpen(true)}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? selectedDate.toDateString() : 'Pick a date'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => {
+                        setSelectedDate(date);
+                        setDateOpen(false);
+                        setTimeout(() => {
+                          const input = document.getElementById('repay-time') as HTMLInputElement | null;
+                          input?.focus();
+                        }, 0);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <div
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm cursor-text"
+                  onClick={() => {
+                    const input = document.getElementById('repay-time') as HTMLInputElement | null;
+                    setSuppressBlur(true);
+                    input?.showPicker?.();
+                    input?.focus();
+                  }}
+                >
+                  <input
+                    id="repay-time"
+                    type="time"
+                    value={time}
+                    onFocus={() => setSuppressBlur(true)}
+                    onChange={(e) => {
+                      setTime(e.target.value);
+                      setTimeout(() => {
+                        setSuppressBlur(false);
+                        (e.target as HTMLInputElement).blur();
+                      }, 150);
+                    }}
+                    onBlur={(e) => {
+                      if (suppressBlur) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        (e.target as HTMLInputElement).focus();
+                      }
+                    }}
+                    className="w-full bg-transparent outline-none"
+                    required
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Maximum 30 days from today
+                  Minimum 48 hours from now, maximum 90 days
                 </p>
               </div>
 
