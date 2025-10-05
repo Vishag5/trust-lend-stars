@@ -9,10 +9,10 @@
     "projectName": "trust-lend-stars",
     "projectPath": "D:\\My Projects\\trust-lend-stars",
     "testIds": [],
-    "additionalInstruction": "Use testsprite_tests\\testsprite_frontend_test_plan.json (array format) with base URL http://localhost:8080; generate raw_report.md and testsprite-mcp-test-report.md.",
+    "additionalInstruction": "Focus on PWA functionality, mobile-first design, payment proof workflows, contract lifecycle management, and reliability score system. Test the complete user journey from login to contract settlement with proper profile navigation and review system.",
     "envs": {
       "API_KEY": "sk-user-NSq7Z_vpRj9mQVaeWvvpn-l94QNwf0NmRQdNVDwXWUMBvcM7ziK9Oc0-FTI44lf72KpxcIpd0LBr43ofzidq7l2wgvicqQTdawaiW-hc2UdcuTNSESYrqIFS_UgUzVaW91I"
     }
   },
-  "proxy": "http://2cca7104-7115-4d98-a81a-402b1d5b8654:jX2cN99LUxSbp3tUhToCuDM9rSdJsV4M@tun.testsprite.com:8080"
+  "proxy": "http://69b7fc18-f5ef-48f8-a6d6-f42085223293:DPd9VvLYw9MET1v4TgIxYCAUVjyNWvzB@tun.testsprite.com:8080"
 }

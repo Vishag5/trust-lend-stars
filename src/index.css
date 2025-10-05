@@ -131,3 +131,117 @@ All colors MUST be HSL.
   .p-6 { padding: 1rem; }
   .p-4 { padding: 0.75rem; }
 }
+
+/* PWA Full-Screen Mobile Styles */
+@layer base {
+  html {
+    width: 100%;
+    height: 100%;
+    /* Prevent the page from being zoomed out on mobile */
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Disable pull-to-refresh on mobile */
+    overscroll-behavior-y: contain;
+    /* Prevent iOS Safari bottom bar from affecting layout */
+    position: fixed;
+  }
+  
+  #root {
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile */
+    min-height: -webkit-fill-available;
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* Smooth scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* iOS Safari safe area support */
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: max(0px, env(safe-area-inset-left));
+      padding-right: max(0px, env(safe-area-inset-right));
+      padding-bottom: max(0px, env(safe-area-inset-bottom));
+    }
+  }
+  
+  /* Prevent zoom on input focus (iOS) */
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px !important;
+  }
+  
+  /* Remove tap highlight color */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Mobile-first button and card sizing */
+  @media (max-width: 768px) {
+    .btn {
+      min-height: 44px; /* iOS recommended touch target */
+      padding: 12px 20px;
+    }
+    
+    /* Ensure cards have proper spacing on mobile */
+    [data-radix-scroll-area-viewport] {
+      max-width: 100vw;
+    }
+  }
+}
+
+/* PWA Standalone mode detection - hide when in app mode */
+@media (display-mode: standalone) {
+  body {
+    /* Add app-specific styles when running as PWA */
+    user-select: none; /* Prevent text selection like native apps */
+  }
+  
+  /* But allow text selection in inputs */
+  input,
+  textarea {
+    user-select: text;
+  }
+}
+
+/* Utility classes for mobile-first design */
+@layer utilities {
+  /* Safe area padding for notch/dynamic island */
+  .pb-safe {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  
+  .pt-safe {
+    padding-top: calc(1rem + env(safe-area-inset-top));
+  }
+  
+  /* Mobile-friendly touch targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* App-like animations */
+  .app-tap {
+    transition: transform 0.1s ease;
+  }
+  
+  .app-tap:active {
+    transform: scale(0.98);
+  }
+}

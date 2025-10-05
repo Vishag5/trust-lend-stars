@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/authStore';
 import { getDataClient, Contract } from '@/lib/dataClient';
-import { ArrowLeft } from 'lucide-react';
-import { StatusBadge } from '@/components/StatusBadge';
-import { formatAmount, formatDateTime, formatPhone } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import { MobileHeader } from '@/components/MobileHeader';
+import { StatusBadge } from '@/components/StatusBadge';
+import { ReliabilityStars } from '@/components/ReliabilityStars';
 import { ExtensionRequestDialog } from '@/components/ExtensionRequestDialog';
 import { SettleUpDialog } from '@/components/SettleUpDialog';
 import { ProofViewerDialog } from '@/components/ProofViewerDialog';
+import { ArrowLeft, FileText } from 'lucide-react';
+import { formatDateTime, formatAmount } from '@/lib/format';
 
 export default function ContractDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
   const { toast } = useToast();
+  
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
   const [showExtensionDialog, setShowExtensionDialog] = useState(false);
@@ -24,6 +28,7 @@ export default function ContractDetail() {
   const [showProofDialog, setShowProofDialog] = useState(false);
 
   useEffect(() => {
+    if (!id) return;
     loadContract();
   }, [id]);
 
@@ -32,41 +37,17 @@ export default function ContractDetail() {
     setLoading(true);
     try {
       const client = getDataClient();
-      const data = await client.getContractById(id);
-      setContract(data);
+      const contractData = await client.getContractById(id);
+      setContract(contractData);
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to load contract', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'Failed to load contract details',
+        variant: 'destructive',
+      });
+      navigate('/dashboard');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAccept = async () => {
-    if (!contract || !currentUserId) return;
-    try {
-      const client = getDataClient();
-      await client.updateContract(contract.id, {
-        status: 'ACTIVE',
-        disbursal_proof_url: 'mock://proof.jpg',
-      });
-      toast({ title: 'Contract accepted' });
-      await loadContract();
-    } catch (error) {
-      toast({ title: 'Error', description: 'Failed to accept contract', variant: 'destructive' });
-    }
-  };
-
-  const handleReject = async () => {
-    if (!contract || !currentUserId) return;
-    try {
-      const client = getDataClient();
-      await client.updateContract(contract.id, {
-        status: 'REJECTED',
-      });
-      toast({ title: 'Contract rejected' });
-      navigate('/dashboard');
-    } catch (error) {
-      toast({ title: 'Error', description: 'Failed to reject contract', variant: 'destructive' });
     }
   };
 
@@ -83,13 +64,13 @@ export default function ContractDetail() {
       });
       setShowExtensionDialog(false);
       toast({ title: 'Extension request sent' });
-      await loadContract();
+      loadContract();
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to send extension request', variant: 'destructive' });
     }
   };
 
-  const handleSettleUpload = async (proofUrl: string) => {
+  const handleSettleSubmit = async (proofUrl: string) => {
     if (!contract) return;
     try {
       const client = getDataClient();
@@ -100,7 +81,7 @@ export default function ContractDetail() {
       });
       setShowSettleDialog(false);
       toast({ title: 'Settlement proof uploaded. Awaiting lender approval.' });
-      await loadContract();
+      loadContract();
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to upload proof', variant: 'destructive' });
     }
@@ -108,16 +89,22 @@ export default function ContractDetail() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="flex min-h-screen flex-col">
+        <MobileHeader title="Contract Details" showBack />
+        <main className="flex flex-1 items-center justify-center">
+          <p className="text-muted-foreground">Loading contract details...</p>
+        </main>
       </div>
     );
   }
 
   if (!contract) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Contract not found</p>
+      <div className="flex min-h-screen flex-col">
+        <MobileHeader title="Contract Details" showBack />
+        <main className="flex flex-1 items-center justify-center">
+          <p className="text-muted-foreground">Contract not found</p>
+        </main>
       </div>
     );
   }
@@ -126,90 +113,103 @@ export default function ContractDetail() {
   const isLender = contract.lender_id === currentUserId;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
-      </header>
-
-      <main className="container mx-auto max-w-3xl px-4 py-8">
-        <Card>
-          <CardHeader>
-              <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-3xl">{formatAmount(contract.amount)}</CardTitle>
-                <p className="mt-2 text-muted-foreground">
-                  {isBorrower ? 'Borrowed from' : 'Lent to'}{' '}
-                  {isBorrower ? contract.lender?.name : contract.borrower?.name}
-                </p>
-              </div>
-                <div className="flex items-center gap-2">
-                  {contract.settlement_pending && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800 text-xs font-medium">Awaiting approval</span>
-                  )}
-                  <StatusBadge status={contract.status} />
-                </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                <p className="text-base font-semibold">{formatDateTime(contract.due_at)}</p>
+    <div className="flex min-h-screen flex-col bg-muted/30">
+      <MobileHeader title="Contract Details" showBack />
+      
+      <main className="flex-1 space-y-4 px-4 py-6">
+        {/* Contract Header */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-lg font-semibold text-primary">
+                  {contract.borrower ? contract.borrower.name.charAt(0).toUpperCase() : '?'}
+                </span>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Created</p>
-                <p className="text-base font-semibold">{formatDateTime(contract.created_at)}</p>
-              </div>
-            </div>
-
-            {contract.reason && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Reason</p>
-                <p className="text-base">{contract.reason}</p>
-              </div>
-            )}
-
-            {contract.status === 'REQUESTED' && isLender && (
-              <div className="flex gap-2 pt-4">
-                <Button onClick={handleAccept}>Accept & Upload Proof</Button>
-                <Button variant="ghost" onClick={handleReject}>Reject</Button>
-              </div>
-            )}
-
-            {contract.status === 'ACTIVE' && isBorrower && (
-              <div className="flex gap-2 pt-4">
-                {contract.settlement_pending ? (
-                  <Button variant="outline" onClick={() => setShowProofDialog(true)}>Awaiting Approval</Button>
-                ) : (
-                  <Button onClick={() => setShowSettleDialog(true)}>Settle Up</Button>
+                <h1 className="text-xl font-semibold">{contract.borrower?.name || 'Unknown'}</h1>
+                {contract.borrower?.trust_reliability_cached !== null && (
+                  <div className="flex items-center gap-1">
+                    <ReliabilityStars score={contract.borrower?.trust_reliability_cached || 0} />
+                  </div>
                 )}
-                <Button variant="outline" onClick={() => setShowExtensionDialog(true)}>Ask for Extension</Button>
               </div>
-            )}
-            {/* Proof viewer for either party */}
-            <ProofViewerDialog
-              open={showProofDialog}
-              onOpenChange={setShowProofDialog}
-              imageUrl={contract.repayment_proof_url || contract.disbursal_proof_url}
-            />
-            <ExtensionRequestDialog
-              open={showExtensionDialog}
-              onOpenChange={setShowExtensionDialog}
-              onSubmit={handleExtensionSubmit}
-              currentDueDate={contract.due_at}
-            />
-            <SettleUpDialog
-              open={showSettleDialog}
-              onOpenChange={setShowSettleDialog}
-              onUpload={handleSettleUpload}
-            />
-          </CardContent>
+            </div>
+            <StatusBadge status={contract.status} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Amount</p>
+              <p className="text-2xl font-bold">{formatAmount(contract.amount)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Due Date</p>
+              <p className="text-lg font-semibold">{formatDateTime(contract.due_at)}</p>
+            </div>
+          </div>
+
+          {contract.reason && (
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Reason</p>
+              <p className="text-base">{contract.reason}</p>
+            </div>
+          )}
+
+          {contract.attachment_url && (
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Attached Document</p>
+              <div className="mt-2">
+                {contract.attachment_url.startsWith('data:image/') ? (
+                  <img 
+                    src={contract.attachment_url} 
+                    alt="Attached document" 
+                    className="max-h-64 w-full rounded-md object-contain border"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 rounded-md border bg-muted/50 p-3">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Document attached</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </Card>
+
+        {/* Actions */}
+        {isBorrower && contract.status === 'ACTIVE' && (
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Actions</h3>
+            {contract.settlement_pending ? (
+              <Button variant="outline" onClick={() => setShowProofDialog(true)}>Awaiting Approval</Button>
+            ) : (
+              <Button onClick={() => setShowSettleDialog(true)}>Mark as Paid</Button>
+            )}
+            <Button variant="outline" onClick={() => setShowExtensionDialog(true)}>Request Extension</Button>
+          </Card>
+        )}
+
+        {/* Proof viewer for either party */}
+        <ProofViewerDialog
+          open={showProofDialog}
+          onOpenChange={setShowProofDialog}
+          proofUrl={contract.repayment_proof_url || ''}
+          title="Repayment Proof"
+        />
+
+        <ExtensionRequestDialog
+          open={showExtensionDialog}
+          onOpenChange={setShowExtensionDialog}
+          onSubmit={handleExtensionSubmit}
+          currentDueDate={contract.due_at}
+        />
+
+        <SettleUpDialog
+          open={showSettleDialog}
+          onOpenChange={setShowSettleDialog}
+          onSubmit={handleSettleSubmit}
+        />
       </main>
     </div>
   );

@@ -1,37 +1,621 @@
 [
   {
-  "id": "lenTrust_e2e",
-  "title": "LenTrust Frontend E2E",
-  "description": "Covers login, dashboard actions, create contract date/time, settle proof, invite dialog.",
-  "base_url": "http://localhost:8080",
-  "steps": [
-    { "type": "visit", "path": "/" },
-    { "type": "click", "selector": "text=Borrower A" },
-    { "type": "assert-visible", "selector": "text=Create New Contract" },
-
-    { "type": "click", "selector": "text=Ask for Time", "optional": true },
-    { "type": "assert-visible", "selector": "text=Request Extension", "optional": true },
-    { "type": "close-dialog", "optional": true },
-
-    { "type": "visit", "path": "/create-contract" },
-    { "type": "type", "selector": "input#phone", "value": "+919000022222" },
-    { "type": "type", "selector": "input#amount", "value": "1200" },
-    { "type": "click", "selector": "#dueDateBtn" },
-    { "type": "pick-date", "value": "+7d" },
-    { "type": "click", "selector": "#repay-time" },
-    { "type": "type", "selector": "#repay-time", "value": "12:30" },
-    { "type": "assert-visible", "selector": "text=Send Loan Request" },
-
-    { "type": "visit", "path": "/dashboard" },
-    { "type": "click", "selector": "text=Invite Friends" },
-    { "type": "assert-visible", "selector": "text=Invite Friends to LenTrust" },
-
-    { "type": "click", "selector": "text=Settle Up", "optional": true },
-    { "type": "upload", "selector": "#repay-proof", "value": "public/placeholder.svg", "optional": true },
-    { "type": "click", "selector": "text=Submit", "optional": true },
-    { "type": "assert-visible", "selector": "text=Awaiting Approval", "optional": true }
-  ]
+    "id": "TC001",
+    "title": "Create contract with valid inputs",
+    "description": "Verify that a borrower can successfully create a loan contract when all inputs are valid and within allowed ranges",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Create Contract form"
+      },
+      {
+        "type": "action",
+        "description": "Input loan amount greater than or equal to Rs. 100"
+      },
+      {
+        "type": "action",
+        "description": "Select due date/time at least 48 hours and no more than 90 days from current date"
+      },
+      {
+        "type": "action",
+        "description": "Enter lender phone number with valid Indian format prefixed with +91"
+      },
+      {
+        "type": "action",
+        "description": "Optionally enter a reason for the loan"
+      },
+      {
+        "type": "action",
+        "description": "Submit contract creation form"
+      },
+      {
+        "type": "assertion",
+        "description": "Check contract is created with status REQUESTED and visible in borrower and lender dashboards"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Contract creation validation for amount below Rs.100",
+    "description": "Verify form prevents contract creation when the loan amount is less than Rs. 100, with appropriate error message",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Create Contract form"
+      },
+      {
+        "type": "action",
+        "description": "Input loan amount Rs. 99"
+      },
+      {
+        "type": "action",
+        "description": "Fill other fields validly"
+      },
+      {
+        "type": "action",
+        "description": "Submit contract creation form"
+      },
+      {
+        "type": "assertion",
+        "description": "Form presents validation error indicating minimum amount requirement"
+      },
+      {
+        "type": "assertion",
+        "description": "Contract is not created"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Contract creation validation for due date outside allowed range",
+    "description": "Ensure loan contract cannot be created if due date is less than 48 hours or more than 90 days from contract creation",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Create Contract form"
+      },
+      {
+        "type": "action",
+        "description": "Input valid loan amount"
+      },
+      {
+        "type": "action",
+        "description": "Set due date to 24 hours from now (less than 48 hours)"
+      },
+      {
+        "type": "action",
+        "description": "Enter valid lender phone"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to submit form"
+      },
+      {
+        "type": "assertion",
+        "description": "Form shows validation error for due date minimum limit"
+      },
+      {
+        "type": "action",
+        "description": "Change due date to 91 days from now (exceeding max limit)"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to submit form"
+      },
+      {
+        "type": "assertion",
+        "description": "Form shows validation error for due date maximum limit"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Contract creation validation for invalid lender phone",
+    "description": "Verify that the lender phone number must be in Indian format prefixed with +91 and invalid formats are rejected",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Create Contract form"
+      },
+      {
+        "type": "action",
+        "description": "Input valid amount and due date"
+      },
+      {
+        "type": "action",
+        "description": "Enter lender phone without +91 prefix"
+      },
+      {
+        "type": "action",
+        "description": "Try submitting the form"
+      },
+      {
+        "type": "assertion",
+        "description": "Form shows phone format validation error"
+      },
+      {
+        "type": "action",
+        "description": "Enter lender phone with invalid characters"
+      },
+      {
+        "type": "action",
+        "description": "Try submitting the form"
+      },
+      {
+        "type": "assertion",
+        "description": "Form shows phone format validation error"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "One active loan request per borrower-lender pair limit",
+    "description": "Confirm that only one active loan request can exist for the same borrower-lender pair at any time",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a contract from borrower to lender with status REQUESTED"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to create another loan contract request to the same lender before the first is accepted or rejected"
+      },
+      {
+        "type": "assertion",
+        "description": "System blocks the second request creation and shows appropriate notification/message"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Lender can view incoming loan requests with Reliability Stars",
+    "description": "Ensure lenders see incoming loan requests along with the borrower's Reliability Stars and review information",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as lender user"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to dashboard or loan requests view"
+      },
+      {
+        "type": "assertion",
+        "description": "Incoming loan requests list is displayed with borrower Reliability Stars visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Negative reviews are shown pinned for borrowers with outstanding issues"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Lender can accept, reject, or counter loan requests",
+    "description": "Verify that lender can perform actions to accept, reject, or send a counter offer on loan requests",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as lender and open a requested contract detail"
+      },
+      {
+        "type": "action",
+        "description": "Click Accept and confirm"
+      },
+      {
+        "type": "assertion",
+        "description": "Contract status changes to ACTIVE"
+      },
+      {
+        "type": "action",
+        "description": "Repeat with another contract and click Reject"
+      },
+      {
+        "type": "assertion",
+        "description": "Contract status changes to REJECTED"
+      },
+      {
+        "type": "action",
+        "description": "Repeat with another contract and send counter-offer with modified terms"
+      },
+      {
+        "type": "assertion",
+        "description": "Counter offer is sent and contract status updated accordingly"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Borrower can request up to 3 extensions per contract",
+    "description": "Verify borrower can request contract extensions up to a maximum of 3 times, with UI feedback",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as borrower and open an ACTIVE contract"
+      },
+      {
+        "type": "action",
+        "description": "Request an extension and submit"
+      },
+      {
+        "type": "assertion",
+        "description": "Extension request is recorded and shown in contract detail"
+      },
+      {
+        "type": "action",
+        "description": "Repeat extension requests until 3 total extensions reached"
+      },
+      {
+        "type": "assertion",
+        "description": "After 3rd extension request, a final extension banner is displayed in the UI"
+      },
+      {
+        "type": "action",
+        "description": "Attempt a 4th extension request"
+      },
+      {
+        "type": "assertion",
+        "description": "System disallows further extension requests with appropriate message"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Lender reviews and responds to extension requests",
+    "description": "Verify that lenders can approve or deny borrower extension requests and status updates accordingly",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as lender and open contract with pending extension request"
+      },
+      {
+        "type": "action",
+        "description": "Review extension request details"
+      },
+      {
+        "type": "action",
+        "description": "Approve the extension request"
+      },
+      {
+        "type": "assertion",
+        "description": "Contract due date is updated and extension count incremented"
+      },
+      {
+        "type": "action",
+        "description": "Repeat for a different request and deny the extension"
+      },
+      {
+        "type": "assertion",
+        "description": "Extension request marked denied and contract due date unchanged"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Borrower uploads payment proof to initiate settlement",
+    "description": "Verify borrower can upload payment proof images to start contract settlement process, contract status moves to SETTLE_PENDING",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as borrower and open ACTIVE or DUE contract"
+      },
+      {
+        "type": "action",
+        "description": "Upload payment proof image with valid format"
+      },
+      {
+        "type": "action",
+        "description": "Submit payment proof"
+      },
+      {
+        "type": "assertion",
+        "description": "Contract status changes to SETTLE_PENDING"
+      },
+      {
+        "type": "assertion",
+        "description": "Payment proof image preview is available in contract detail"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Lender approves or denies payment proofs for settlement",
+    "description": "Confirm that lenders can review, approve, or deny submitted payment proof images and contract status updates accordingly",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as lender and open contract in SETTLE_PENDING status"
+      },
+      {
+        "type": "action",
+        "description": "View payment proof image preview"
+      },
+      {
+        "type": "action",
+        "description": "Approve the payment proof"
+      },
+      {
+        "type": "assertion",
+        "description": "Contract status changes to SETTLED"
+      },
+      {
+        "type": "action",
+        "description": "Repeat and deny the payment proof on different contract"
+      },
+      {
+        "type": "assertion",
+        "description": "Contract status reverts or remains ACTIVE as per denial workflow"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Reliability Stars calculation updates on repayment and reviews",
+    "description": "Verify that borrower’s Reliability Stars update correctly based on repayment timeliness and lender reviews including pinned negative reviews",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Complete contract repayment with lender posting review indicating timely payment"
+      },
+      {
+        "type": "assertion",
+        "description": "Reliability Stars increase or remain stable accurately for the borrower"
+      },
+      {
+        "type": "action",
+        "description": "Post a negative review due to late payment or unresolved dues"
+      },
+      {
+        "type": "assertion",
+        "description": "Negative review is pinned and Reliability Stars decrease accordingly"
+      },
+      {
+        "type": "action",
+        "description": "Resolve outstanding dues and lender removes negative review"
+      },
+      {
+        "type": "assertion",
+        "description": "Pinned negative review is unpinned and Reliability Stars update positively"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Role-based visibility: Reliability Stars visible only to lenders",
+    "description": "Confirm that the borrower’s Reliability Stars and scores are visible only to lender users and hidden from borrower and other roles",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as borrower and navigate to loan requests and contract views"
+      },
+      {
+        "type": "assertion",
+        "description": "Reliability Stars and score are not visible or accessible"
+      },
+      {
+        "type": "action",
+        "description": "Log in as lender and view the borrower’s loan requests and contract details"
+      },
+      {
+        "type": "assertion",
+        "description": "Reliability Stars and score are clearly visible"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "UI validation errors display correct messages",
+    "description": "Verify all validation error messages for contract creation fields (amount, due date, phone) are accurate, clear, and prominent",
+    "category": "ui",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger amount validation error by entering < Rs. 100"
+      },
+      {
+        "type": "assertion",
+        "description": "Error message shown: 'Amount must be at least Rs. 100'"
+      },
+      {
+        "type": "action",
+        "description": "Trigger due date validation errors by setting date outside 48h-90d range"
+      },
+      {
+        "type": "assertion",
+        "description": "Error message shown: 'Due date must be between 48 hours and 90 days from now'"
+      },
+      {
+        "type": "action",
+        "description": "Trigger phone validation error with incorrect format"
+      },
+      {
+        "type": "assertion",
+        "description": "Error message shown: 'Lender phone must be Indian format starting with +91'"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Offline-first data persistence and retrieval",
+    "description": "Validate that user and contract data persist locally and can be accessed and updated reliably when offline using LocalStorage",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create and save contract data while online"
+      },
+      {
+        "type": "action",
+        "description": "Go offline and reload the app"
+      },
+      {
+        "type": "assertion",
+        "description": "Previously saved contract and user data load correctly from LocalStorage"
+      },
+      {
+        "type": "action",
+        "description": "Perform CRUD operations on contracts and user profiles offline"
+      },
+      {
+        "type": "assertion",
+        "description": "Data changes persist locally without errors"
+      },
+      {
+        "type": "action",
+        "description": "Go online and verify synchronization or data consistency"
+      },
+      {
+        "type": "assertion",
+        "description": "Data is consistent and no data loss occurs"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "SPA routing navigates correctly across all major pages",
+    "description": "Verify smooth SPA routing for all defined pages: login, dashboard, contracts (list/detail/create), profiles, search, analytics, settings, and help",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in and navigate sequentially to dashboard, create contract, contracts list, contract detail, user profiles, search, analytics, settings, help, and an invalid URL"
+      },
+      {
+        "type": "assertion",
+        "description": "Each route loads the expected page content without full page reload"
+      },
+      {
+        "type": "assertion",
+        "description": "Invalid URL displays NotFound page"
+      },
+      {
+        "type": "assertion",
+        "description": "Browser back and forward buttons work as expected within the SPA"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Search and user switching functionality",
+    "description": "Ensure users can search profiles and switch between users seamlessly",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Search Profiles page"
+      },
+      {
+        "type": "action",
+        "description": "Perform search queries with valid keywords and partial matches"
+      },
+      {
+        "type": "assertion",
+        "description": "Search results list relevant user profiles accurately filtered"
+      },
+      {
+        "type": "action",
+        "description": "Select a user from search results and switch to that user using the User Switcher UI"
+      },
+      {
+        "type": "assertion",
+        "description": "App state updates to the selected user and reflects in profile and dashboard views"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Payment proof upload validations and image preview",
+    "description": "Verify payment proof upload supports valid image types, rejects invalid types, and allows preview before submission",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open payment proof upload dialog"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to upload valid image file formats (jpg, png)"
+      },
+      {
+        "type": "assertion",
+        "description": "Images load correctly and preview is shown"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to upload invalid file types (pdf, txt)"
+      },
+      {
+        "type": "assertion",
+        "description": "Upload is rejected with clear validation error"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Contract status lifecycle flows",
+    "description": "Verify contract transitions properly through statuses: REQUESTED, ACTIVE, DUE, SETTLE_PENDING, SETTLED, REJECTED according to user actions",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a contract, verify initial status REQUESTED"
+      },
+      {
+        "type": "action",
+        "description": "Lender accepts contract, status changes to ACTIVE"
+      },
+      {
+        "type": "action",
+        "description": "Simulate due date passing, status updates to DUE"
+      },
+      {
+        "type": "action",
+        "description": "Borrower uploads payment proof, status becomes SETTLE_PENDING"
+      },
+      {
+        "type": "action",
+        "description": "Lender approves settlement, status updates to SETTLED"
+      },
+      {
+        "type": "action",
+        "description": "Create contract and lender rejects it, status changes to REJECTED"
+      },
+      {
+        "type": "assertion",
+        "description": "All status changes correspond correctly to the business rules and UI updates"
+      }
+    ]
   }
 ]
-
-

@@ -51,18 +51,19 @@ export default function Contracts() {
     );
   }
 
-  // Sort contracts: REQUESTED first, then ACTIVE/DUE, then SETTLED last
+  // Sort contracts: DUE first, then ACTIVE, then SETTLED last
   const sortedContracts = [...contracts].sort((a, b) => {
-    const statusOrder = { 'REQUESTED': 0, 'ACTIVE': 1, 'DUE': 1, 'SETTLED': 3, 'REJECTED': 4 };
+    const statusOrder = { 'DUE': 0, 'ACTIVE': 1, 'SETTLED': 2, 'REQUESTED': 3, 'REJECTED': 4 };
     return statusOrder[a.status] - statusOrder[b.status];
   });
 
   const allContracts = sortedContracts.filter(c => c.status !== 'REJECTED');
-  const activeContracts = contracts.filter(c => c.status === 'ACTIVE' || c.status === 'DUE');
+  const dueContracts = contracts.filter(c => c.status === 'DUE');
+  const activeContracts = contracts.filter(c => c.status === 'ACTIVE');
   const settledContracts = contracts.filter(c => c.status === 'SETTLED');
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-muted/30">
       <MobileHeader title="View Contracts" showBack />
       
       <main className="flex-1 px-4 py-6">
@@ -72,8 +73,9 @@ export default function Contracts() {
         </p>
 
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">All ({allContracts.length})</TabsTrigger>
+            <TabsTrigger value="due">Due ({dueContracts.length})</TabsTrigger>
             <TabsTrigger value="active">Active ({activeContracts.length})</TabsTrigger>
             <TabsTrigger value="settled">Settled ({settledContracts.length})</TabsTrigger>
           </TabsList>
@@ -86,7 +88,20 @@ export default function Contracts() {
                 <ContractCard
                   key={contract.id}
                   contract={contract}
-                  currentUserId={currentUserId!}
+                  onUpdate={loadContracts}
+                />
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="due" className="space-y-3">
+            {dueContracts.length === 0 ? (
+              <p className="py-8 text-center text-muted-foreground">No due contracts</p>
+            ) : (
+              dueContracts.map((contract) => (
+                <ContractCard
+                  key={contract.id}
+                  contract={contract}
                   onUpdate={loadContracts}
                 />
               ))
@@ -101,7 +116,6 @@ export default function Contracts() {
                 <ContractCard
                   key={contract.id}
                   contract={contract}
-                  currentUserId={currentUserId!}
                   onUpdate={loadContracts}
                 />
               ))
@@ -116,7 +130,6 @@ export default function Contracts() {
                 <ContractCard
                   key={contract.id}
                   contract={contract}
-                  currentUserId={currentUserId!}
                   onUpdate={loadContracts}
                 />
               ))

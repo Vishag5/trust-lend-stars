@@ -88,7 +88,7 @@ export default function Profile() {
             {reliability && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Reliability Score</h3>
+                  <h3 className="font-semibold">Trust Score</h3>
                   <span className="text-2xl font-bold text-primary">{reliability.percentage}%</span>
                 </div>
                 

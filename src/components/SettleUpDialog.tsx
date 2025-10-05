@@ -40,7 +40,7 @@ export function SettleUpDialog({ open, onOpenChange, onUpload }: SettleUpDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Settle Up</DialogTitle>
+          <DialogTitle>Mark as Paid</DialogTitle>
           <DialogDescription>
             Upload a screenshot or receipt of your repayment. This will be sent to the lender for approval.
           </DialogDescription>
@@ -49,14 +49,24 @@ export function SettleUpDialog({ open, onOpenChange, onUpload }: SettleUpDialogP
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="repay-proof">Repayment Proof *</Label>
-            <input
-              id="repay-proof"
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                id="repay-proof"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="flex-1 rounded-md border bg-background px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Choose File
+              </Button>
+            </div>
             {previewUrl && (
               <img src={previewUrl} alt="Repayment proof preview" className="mt-2 max-h-48 w-full rounded-md object-contain border" />
             )}

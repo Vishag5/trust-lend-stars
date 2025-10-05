@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -24,10 +24,24 @@ export function ExtensionRequestDialog({
 }: ExtensionRequestDialogProps) {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [reason, setReason] = useState('');
-  const [time, setTime] = useState(''); // HH:MM
+  const [time, setTime] = useState('10:00'); // HH:MM
   const [suppressBlur, setSuppressBlur] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
   const timeInputRef = useState<HTMLInputElement | null>(null)[0];
+
+  // Focus the reason textarea when dialog opens
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => {
+        const reasonTextarea = document.getElementById('reason') as HTMLTextAreaElement;
+        if (reasonTextarea) {
+          reasonTextarea.focus();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
 
   const handleSubmit = () => {
     if (!selectedDate) return;
@@ -43,10 +57,22 @@ export function ExtensionRequestDialog({
     onOpenChange(false);
   };
 
-  const minDate = new Date(currentDueDate);
+  const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setReason(e.target.value);
+  };
+
+  // Validate currentDueDate and provide fallback
+  const getCurrentDueDate = () => {
+    if (!currentDueDate || currentDueDate === '') {
+      return new Date(); // Fallback to current date
+    }
+    const date = new Date(currentDueDate);
+    return isNaN(date.getTime()) ? new Date() : date; // Fallback if invalid
+  };
+
+  const minDate = new Date(getCurrentDueDate());
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const disabledDate = minDate > today ? minDate : today;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,7 +80,7 @@ export function ExtensionRequestDialog({
         <DialogHeader>
           <DialogTitle>Request Extension</DialogTitle>
           <DialogDescription>
-            Choose a new due date and provide a reason for the extension request.
+            Request an extension for your loan repayment date.
           </DialogDescription>
         </DialogHeader>
         
@@ -62,7 +88,7 @@ export function ExtensionRequestDialog({
           <div className="space-y-2">
             <Label>Current Due Date</Label>
             <p className="text-sm text-muted-foreground">
-              {format(new Date(currentDueDate), 'PPP')}
+              {format(getCurrentDueDate(), 'PPP')}
             </p>
           </div>
 
@@ -74,12 +100,12 @@ export function ExtensionRequestDialog({
                   id="new-date"
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
+                    'w-full justify-start text-left font-normal',
+                    !selectedDate && 'text-muted-foreground'
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                  {selectedDate ? selectedDate.toDateString() : 'Pick a date'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -88,14 +114,13 @@ export function ExtensionRequestDialog({
                   selected={selectedDate}
                   onSelect={(date) => {
                     setSelectedDate(date);
-                    // Auto close the calendar after selecting a date and focus time
                     setDateOpen(false);
                     setTimeout(() => {
                       const input = document.getElementById('new-time') as HTMLInputElement | null;
                       input?.focus();
                     }, 0);
                   }}
-                  disabled={(date) => date < disabledDate}
+                  disabled={(date) => date < minDate}
                   initialFocus
                 />
               </PopoverContent>
@@ -107,47 +132,66 @@ export function ExtensionRequestDialog({
             <div
               className="w-full rounded-md border bg-background px-3 py-2 text-sm cursor-text"
               onClick={() => {
+                setTimePickerOpen(true);
                 const input = document.getElementById('new-time') as HTMLInputElement | null;
-                setSuppressBlur(true);
-                input?.showPicker?.();
-                input?.focus();
+                setTimeout(() => {
+                  input?.showPicker?.();
+                  input?.focus();
+                }, 100);
               }}
             >
               <input
                 id="new-time"
                 type="time"
                 value={time}
-                onFocus={() => setSuppressBlur(true)}
+                onFocus={() => {
+                  setTimePickerOpen(true);
+                  setSuppressBlur(true);
+                }}
                 onChange={(e) => {
                   setTime(e.target.value);
-                  // Close after a short delay to allow minute AM/PM selection on some UIs
-                  setTimeout(() => {
-                    setSuppressBlur(false);
-                    (e.target as HTMLInputElement).blur();
-                  }, 150);
+                  // Don't auto-close, let user finish selecting AM/PM
                 }}
                 onBlur={(e) => {
                   if (suppressBlur) {
                     e.preventDefault();
                     e.stopPropagation();
                     (e.target as HTMLInputElement).focus();
+                  } else {
+                    setTimePickerOpen(false);
                   }
                 }}
                 className="w-full bg-transparent outline-none"
                 required
               />
             </div>
+            {timePickerOpen && (
+              <p className="text-xs text-muted-foreground">
+                Select time and AM/PM, then click outside to close
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason for Extension *</Label>
-            <Textarea
-              id="reason"
-              placeholder="Explain why you need more time..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={4}
-            />
+            <Label htmlFor="reason">Reason for Extension</Label>
+            <div className="relative">
+              <Textarea
+                id="reason"
+                placeholder="Explain why you need an extension..."
+                value={reason}
+                onChange={handleReasonChange}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                rows={3}
+                className="resize-none focus:ring-2 focus:ring-primary focus:border-primary w-full"
+                disabled={false}
+                autoFocus={false}
+                tabIndex={0}
+                style={{ pointerEvents: 'auto' }}
+              />
+            </div>
           </div>
         </div>
 
@@ -155,11 +199,8 @@ export function ExtensionRequestDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={!selectedDate || !time || !reason.trim()}
-          >
-            Submit Request
+          <Button onClick={handleSubmit} disabled={!selectedDate}>
+            Request Extension
           </Button>
         </DialogFooter>
       </DialogContent>

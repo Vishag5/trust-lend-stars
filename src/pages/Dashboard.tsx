@@ -9,26 +9,39 @@ import { MobileHeader } from '@/components/MobileHeader';
 import { ExtensionRequestDialog } from '@/components/ExtensionRequestDialog';
 import { SettleUpDialog } from '@/components/SettleUpDialog';
 import { ProofViewerDialog } from '@/components/ProofViewerDialog';
-import { Plus, Search, FileText, Clock, User, Calendar, IndianRupee, Share2 } from 'lucide-react';
+import { PaymentProofDialog } from '@/components/PaymentProofDialog';
+import { ValidateProofDialog } from '@/components/ValidateProofDialog';
+import { ReviewDialog } from '@/components/ReviewDialog';
+import { Plus, Search, FileText, Clock, User, Calendar, IndianRupee, Share2, BarChart3, Settings, HelpCircle, UserCircle, Eye } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ReliabilityStars } from '@/components/ReliabilityStars';
 import { computeReliability } from '@/lib/reliability';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { InviteDialog } from '@/components/InviteDialog';
+import { ContractHistoryDialog } from '@/components/ContractHistoryDialog';
+import { ContractDetailsDialog } from '@/components/ContractDetailsDialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
   const { toast } = useToast();
+  
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
   const [showExtensionDialog, setShowExtensionDialog] = useState(false);
   const [showSettleDialog, setShowSettleDialog] = useState(false);
-  const [activeContract, setActiveContract] = useState<Contract | null>(null);
   const [showProofDialog, setShowProofDialog] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [showPaymentProofDialog, setShowPaymentProofDialog] = useState(false);
+  const [showValidateProofDialog, setShowValidateProofDialog] = useState(false);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [showContractHistoryDialog, setShowContractHistoryDialog] = useState(false);
+  const [showContractDetailsDialog, setShowContractDetailsDialog] = useState(false);
+  const [proofType, setProofType] = useState<'disbursal' | 'settlement'>('disbursal');
+  const [activeContract, setActiveContract] = useState<Contract | null>(null);
+  const [activeExtension, setActiveExtension] = useState<Extension | null>(null);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -64,19 +77,131 @@ export default function Dashboard() {
     }
   };
 
-  const handleAccept = async (contractId: string) => {
+  const handleAccept = async (contract: Contract) => {
+    // Set the active contract and show payment proof dialog
+    setActiveContract(contract);
+    setProofType('disbursal');
+    setShowPaymentProofDialog(true);
+  };
+
+  const handlePaymentProofSubmit = async (proofUrl: string, notes?: string) => {
+    if (!activeContract) return;
+    
     try {
       const client = getDataClient();
-      await client.updateContract(contractId, { 
-        status: 'ACTIVE', 
-        disbursal_proof_url: 'mock://proof.jpg' 
-      });
-      toast({ title: 'Contract accepted!' });
+      
+      if (proofType === 'disbursal') {
+        // Lender uploading disbursal proof
+        await client.updateContract(activeContract.id, { 
+          status: 'PENDING_DISBURSAL',
+          disbursal_proof_url: proofUrl,
+        });
+        toast({ 
+          title: 'Payment proof uploaded!',
+          description: 'Waiting for borrower to confirm receipt',
+        });
+      } else {
+        // Borrower uploading settlement proof
+        await client.updateContract(activeContract.id, { 
+          status: 'PENDING_SETTLEMENT',
+          repayment_proof_url: proofUrl,
+          settlement_pending: true,
+        });
+        toast({ 
+          title: 'Settlement proof uploaded!',
+          description: 'Waiting for lender to confirm receipt',
+        });
+      }
+      
+      setShowPaymentProofDialog(false);
+      setActiveContract(null);
       loadData();
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to accept contract',
+        description: 'Failed to upload payment proof',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleValidateProof = async (approved: boolean) => {
+    if (!activeContract) return;
+    
+    try {
+      const client = getDataClient();
+      
+      if (proofType === 'disbursal') {
+        // Borrower validating lender's disbursal proof
+        if (approved) {
+          await client.updateContract(activeContract.id, { 
+        status: 'ACTIVE', 
+          });
+          toast({ 
+            title: 'Payment confirmed!',
+            description: 'Contract is now active',
+          });
+        } else {
+          await client.updateContract(activeContract.id, { 
+            status: 'REQUESTED',
+            disbursal_proof_url: null,
+          });
+          toast({ 
+            title: 'Payment proof rejected',
+            description: 'Please contact the lender',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        // Lender validating borrower's settlement proof
+        if (approved) {
+          await client.updateContract(activeContract.id, { 
+            status: 'SETTLED',
+            settlement_pending: false,
+          });
+          
+          // Keep the contract active for review dialog
+          const contractForReview = activeContract;
+          
+          setShowValidateProofDialog(false);
+          loadData();
+          
+          // Show success message
+          toast({ 
+            title: 'Settlement confirmed!',
+            description: 'Please rate and review the borrower',
+          });
+          
+          // Automatically open review dialog after a short delay
+          setTimeout(() => {
+            setActiveContract(contractForReview);
+            // Trigger the review dialog by simulating the Rate & Review button click
+            // We'll use a custom event or state to trigger the review dialog
+            setShowReviewDialog(true);
+          }, 1000);
+          
+          return; // Don't set activeContract to null yet
+        } else {
+          await client.updateContract(activeContract.id, { 
+            status: 'DUE',
+            repayment_proof_url: null,
+            settlement_pending: false,
+          });
+          toast({ 
+            title: 'Settlement proof rejected',
+            description: 'Please contact the borrower',
+            variant: 'destructive',
+          });
+        }
+      }
+      
+      setShowValidateProofDialog(false);
+      setActiveContract(null);
+      loadData();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to process validation',
         variant: 'destructive',
       });
     }
@@ -132,27 +257,62 @@ export default function Dashboard() {
     }
   };
 
-  const handleSettleUpload = async (proofUrl: string) => {
+  const handleInitiateSettlement = (contract: Contract) => {
+    // Set the active contract and show payment proof dialog for settlement
+    setActiveContract(contract);
+    setProofType('settlement');
+    setShowPaymentProofDialog(true);
+  };
+
+  const handleViewProof = (contract: Contract, type: 'disbursal' | 'settlement') => {
+    setActiveContract(contract);
+    setProofType(type);
+    setShowValidateProofDialog(true);
+  };
+
+  const handleReviewSubmit = async (rating: number, review: string) => {
     if (!activeContract) return;
+    
     try {
       const client = getDataClient();
-      await client.updateContract(activeContract.id, {
-        status: 'DUE',
-        repayment_proof_url: proofUrl,
-        settlement_pending: true,
+      await client.createReview({
+        contract_id: activeContract.id,
+        reviewer_id: currentUserId,
+        reviewee_id: activeContract.borrower_id,
+        stars: rating,
+        text: review || null,
       });
-      setShowSettleDialog(false);
+      
+      setShowReviewDialog(false);
       setActiveContract(null);
-      toast({ title: 'Settlement proof uploaded. Awaiting lender approval.' });
+      toast({ 
+        title: 'Review submitted successfully!',
+        description: 'Thank you for rating the borrower',
+      });
       loadData();
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to upload proof', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'Failed to submit review',
+        variant: 'destructive',
+      });
     }
+  };
+
+  const handleViewContractHistory = (contract: Contract, extension: Extension) => {
+    setActiveContract(contract);
+    setActiveExtension(extension);
+    setShowContractHistoryDialog(true);
+  };
+
+  const handleViewContractDetails = (contract: Contract) => {
+    setActiveContract(contract);
+    setShowContractDetailsDialog(true);
   };
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex min-h-screen min-h-[100dvh] flex-col bg-background">
         <MobileHeader />
         <main className="flex flex-1 items-center justify-center">
           <p className="text-muted-foreground">Loading...</p>
@@ -165,10 +325,34 @@ export default function Dashboard() {
     (c) => c.lender_id === currentUserId && c.status === 'REQUESTED'
   );
   
+  const requestsAsBorrower = contracts.filter(
+    (c) => c.borrower_id === currentUserId && c.status === 'REQUESTED'
+  );
+  
   const pendingExtensions = extensions.filter(e => {
     const contract = contracts.find(c => c.id === e.contract_id);
     return contract && contract.lender_id === currentUserId && e.approved === null;
   });
+  
+  // Pending disbursal - Borrower needs to validate lender's payment proof
+  const pendingDisbursalAsBorrower = contracts.filter(
+    c => c.status === 'PENDING_DISBURSAL' && c.borrower_id === currentUserId
+  );
+
+  // Pending disbursal - Lender waiting for borrower to validate
+  const pendingDisbursalAsLender = contracts.filter(
+    c => c.status === 'PENDING_DISBURSAL' && c.lender_id === currentUserId
+  );
+
+  // Pending settlement - Lender needs to validate borrower's repayment proof
+  const pendingSettlementAsLender = contracts.filter(
+    c => c.status === 'PENDING_SETTLEMENT' && c.lender_id === currentUserId
+  );
+
+  // Pending settlement - Borrower waiting for lender to validate
+  const pendingSettlementAsBorrower = contracts.filter(
+    c => c.status === 'PENDING_SETTLEMENT' && c.borrower_id === currentUserId
+  );
   
   const activeContracts = contracts.filter(
     (c) => (c.borrower_id === currentUserId || c.lender_id === currentUserId) && 
@@ -198,20 +382,331 @@ export default function Dashboard() {
     return days;
   };
 
+  // Get a valid due date for the extension dialog
+  const getValidDueDate = () => {
+    if (activeContract?.due_at) {
+      const date = new Date(activeContract.due_at);
+      return isNaN(date.getTime()) ? new Date().toISOString() : activeContract.due_at;
+    }
+    return new Date().toISOString();
+  };
+
   return (
-    <div className="flex min-h-screen flex-col bg-muted/30">
+    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-muted/30">
       <MobileHeader />
       
-      <main className="flex-1 space-y-4 px-4 py-6">
+      <main className="flex-1 space-y-4 px-4 sm:px-6 py-6 pb-safe">
+        {/* Development Tools */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-muted/50 border border-dashed rounded-md p-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm">
+                <p className="font-semibold">Development Mode</p>
+                <p className="text-xs text-muted-foreground">Demo data with payment proofs</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm('This will reset all data and reload with fresh demo data including payment proofs. Continue?')) {
+                    localStorage.clear();
+                    window.location.reload();
+                  }
+                }}
+              >
+                Reset Demo Data
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Navigation */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate('/analytics')}
+            className="flex items-center gap-2"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Analytics
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate('/settings')}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate('/help')}
+            className="flex items-center gap-2"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Help
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              // Navigate to the appropriate profile based on user type
+              const isBorrower = contracts.some(c => c.borrower_id === currentUserId);
+              if (isBorrower) {
+                navigate(`/borrower/${currentUserId}`);
+              } else {
+                navigate(`/lender/${currentUserId}`);
+              }
+              // Scroll to top of the page
+              setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+            }}
+            className="flex items-center gap-2"
+          >
+            <UserCircle className="h-4 w-4" />
+            My Profile
+          </Button>
+        </div>
+
+        {/* Summary Stats Cards */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <IndianRupee className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium">You Owe</span>
+            </div>
+            <div className="text-2xl font-bold">₹{youOwe.reduce((sum, c) => sum + c.amount, 0)}</div>
+            <div className="text-xs text-muted-foreground">{youOwe.length} active loans</div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <IndianRupee className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium">They Owe You</span>
+            </div>
+            <div className="text-2xl font-bold">₹{totalLent}</div>
+            <div className="text-xs text-muted-foreground">{theyOweYou.length} active loans</div>
+          </Card>
+        </div>
+
+        {/* Request Loan Button */}
+        <div className="space-y-3">
+          <Button 
+            className="w-full" 
+            size="lg"
+            onClick={() => navigate('/create-contract')}
+          >
+            <Plus className="mr-2 h-5 w-5" />
+            Request Loan
+          </Button>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline" onClick={() => navigate('/contracts')}>
+              <FileText className="mr-2 h-4 w-4" />
+              All Contracts
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/search')}>
+              <Search className="mr-2 h-4 w-4" />
+              Find People
+            </Button>
+          </div>
+        </div>
+
         {/* Summary Stats */}
         <div className="text-sm text-muted-foreground">
           {requestsAsLender.length > 0 && `${requestsAsLender.length} new requests`}
-          {requestsAsLender.length > 0 && activeContracts.length > 0 && ' • '}
+          {requestsAsLender.length > 0 && requestsAsBorrower.length > 0 && ' • '}
+          {requestsAsBorrower.length > 0 && `${requestsAsBorrower.length} your requests`}
+          {requestsAsBorrower.length > 0 && activeContracts.length > 0 && ' • '}
           {activeContracts.length > 0 && `${activeContracts.length} active contracts`}
           {(requestsAsLender.length > 0 || pendingExtensions.length > 0) && ` • ${requestsAsLender.length + pendingExtensions.length} need attention`}
         </div>
 
-        {/* Loan Requests */}
+        {/* Pending Disbursal - Lender waiting for borrower validation */}
+        {pendingDisbursalAsLender.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              ⏳ Awaiting Borrower Confirmation
+              <span className="text-sm font-normal text-muted-foreground">
+                ({pendingDisbursalAsLender.length})
+              </span>
+            </h2>
+            {pendingDisbursalAsLender.map((contract) => (
+              <Card key={contract.id} className="p-4 border-blue-500/50 bg-blue-50">
+                <div className="mb-3 flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
+                        {contract.borrower ? getInitials(contract.borrower.name) : '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold">{contract.borrower?.name}</h3>
+                      <p className="text-xs text-muted-foreground">Borrower</p>
+                    </div>
+                  </div>
+                  <StatusBadge status={contract.status} />
+                </div>
+                
+                <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <IndianRupee className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Amount</div>
+                      <div className="font-semibold">₹{contract.amount.toLocaleString('en-IN')}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Due Date</div>
+                      <div className="font-semibold">{format(new Date(contract.due_at), 'MMM dd, yyyy')}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-blue-100 border border-blue-300 rounded-md p-3 mb-3">
+                  <p className="text-sm font-medium text-blue-900">
+                    ✅ You uploaded payment proof. Waiting for {contract.borrower?.name} to confirm receipt.
+                  </p>
+                </div>
+                
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setActiveContract(contract);
+                    setProofType('disbursal');
+                    setShowValidateProofDialog(true);
+                  }}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Your Uploaded Proof
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Pending Disbursal - Borrower needs to validate payment */}
+        {pendingDisbursalAsBorrower.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              💳 Verify Payment Receipt
+              <span className="text-sm font-normal text-muted-foreground">
+                ({pendingDisbursalAsBorrower.length})
+              </span>
+            </h2>
+            {pendingDisbursalAsBorrower.map((contract) => (
+                <Card key={contract.id} className="p-4 border-warning/50 bg-warning/5">
+                  <div className="mb-3 flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
+                          {contract.lender ? getInitials(contract.lender.name) : '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-semibold">{contract.lender?.name}</h3>
+                        <p className="text-xs text-muted-foreground">Lender</p>
+                      </div>
+                    </div>
+                    <StatusBadge status={contract.status} />
+                  </div>
+                  
+                  <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <IndianRupee className="h-4 w-4 text-warning" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Amount</div>
+                        <div className="font-semibold">₹{contract.amount.toLocaleString('en-IN')}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-warning" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Due Date</div>
+                        <div className="font-semibold">{format(new Date(contract.due_at), 'MMM dd, yyyy')}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-warning/10 border border-warning/30 rounded-md p-3 mb-3">
+                    <p className="text-sm font-medium text-warning-foreground">
+                      ⚠️ Lender has uploaded payment proof. Please verify you received the money!
+                    </p>
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
+                    onClick={() => handleViewProof(contract, 'disbursal')}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    View & Verify Payment Proof
+                  </Button>
+                </Card>
+              ))}
+          </div>
+        )}
+
+        {/* My Loan Requests (as Borrower) */}
+        {requestsAsBorrower.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold">My Loan Requests ({requestsAsBorrower.length})</h2>
+            {requestsAsBorrower.map((contract) => (
+              <Card key={contract.id} className="p-4">
+                <div 
+                  className="mb-3 flex items-start justify-between cursor-pointer" 
+                  onClick={() => navigate(`/lender/${contract.lender_id}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
+                        {contract.lender ? getInitials(contract.lender.name) : '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold">{contract.lender?.name}</h3>
+                      <p className="text-xs text-muted-foreground">Lender</p>
+                    </div>
+                  </div>
+                  <StatusBadge status={contract.status} />
+                </div>
+                
+                <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <IndianRupee className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Amount</div>
+                      <div className="font-semibold">₹{contract.amount}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Due</div>
+                      <div className="font-semibold">{format(new Date(contract.due_at), 'MMM dd, yyyy')}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                {contract.reason && (
+                  <p className="text-sm text-muted-foreground mb-3">Reason: {contract.reason}</p>
+                )}
+                
+                <div className="text-sm text-muted-foreground">
+                  <p>Awaiting lender response...</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Loan Requests (as Lender) */}
         {requestsAsLender.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">Loan Requests ({requestsAsLender.length})</h2>
@@ -219,7 +714,7 @@ export default function Dashboard() {
               <Card key={contract.id} className="p-4">
                 <div 
                   className="mb-3 flex items-start justify-between cursor-pointer" 
-                  onClick={() => navigate(`/user/${contract.borrower_id}`)}
+                  onClick={() => navigate(`/borrower/${contract.borrower_id}`)}
                 >
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
@@ -229,9 +724,13 @@ export default function Dashboard() {
                     </Avatar>
                     <div>
                       <h3 className="font-semibold">{contract.borrower?.name}</h3>
+                      <p className="text-xs text-muted-foreground">Borrower</p>
                       {contract.borrower?.trust_reliability_cached !== null && (
-                        <div className="text-xs text-muted-foreground">
-                          Reliability: {contract.borrower.trust_reliability_cached}%
+                        <div className="flex items-center gap-1 mt-1">
+                          <ReliabilityStars score={contract.borrower.trust_reliability_cached} />
+                          <span className="text-xs text-muted-foreground">
+                            {contract.borrower.trust_reliability_cached}%
+                          </span>
                         </div>
                       )}
                     </div>
@@ -248,39 +747,39 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <Calendar className="h-4 w-4 text-primary" />
                     <div>
-                      <div className="text-xs text-muted-foreground">Due Date</div>
-                      <div className="font-semibold">{format(new Date(contract.due_at), 'MM/dd/yyyy')}</div>
+                      <div className="text-xs text-muted-foreground">Due</div>
+                      <div className="font-semibold">{format(new Date(contract.due_at), 'MMM dd, yyyy')}</div>
                     </div>
                   </div>
                 </div>
 
                 {contract.reason && (
-                  <div className="mb-3 text-sm">
-                    <span className="font-medium">Purpose:</span> {contract.reason}
-                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Reason: {contract.reason}</p>
                 )}
 
                 <div className="flex gap-2">
                   <Button 
+                    size="sm" 
                     className="flex-1 bg-success hover:bg-success/90" 
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleAccept(contract.id);
+                      handleAccept(contract);
                     }}
                   >
-                    ✓ Accept
+                    Accept & Upload Proof
                   </Button>
                   <Button 
-                    variant="ghost" 
+                    size="sm" 
+                    variant="destructive" 
                     className="flex-1" 
                     onClick={(e) => {
                       e.stopPropagation();
                       handleReject(contract.id);
                     }}
                   >
-                    ✕ Reject
+                    Reject
                   </Button>
                 </div>
               </Card>
@@ -291,75 +790,77 @@ export default function Dashboard() {
         {/* Extension Requests */}
         {pendingExtensions.length > 0 && (
           <div className="space-y-3">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <Clock className="h-5 w-5" />
-              Extension Requests ({pendingExtensions.length})
-            </h2>
+            <h2 className="text-lg font-semibold">Extension Requests ({pendingExtensions.length})</h2>
             {pendingExtensions.map((extension) => {
               const contract = contracts.find(c => c.id === extension.contract_id);
               if (!contract) return null;
+              
               return (
-                <Card key={extension.id} className="p-4">
+                <Card key={extension.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleViewContractHistory(contract, extension)}>
                   <div className="mb-3 flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
                           {contract.borrower ? getInitials(contract.borrower.name) : '?'}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <h3 className="font-semibold">{contract.borrower?.name}</h3>
+                        <div className="text-xs text-muted-foreground">
+                          Requesting {extension.extra_days} extra days
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <ReliabilityStars score={contract.borrower?.trust_reliability_cached || 0} />
+                          <span className="text-xs text-muted-foreground">
+                            {contract.borrower?.trust_reliability_cached || 0}% reliability
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <StatusBadge status="REQUESTED" />
-                  </div>
-                  
-                  <div className="mb-3 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Loan Amount:</span>
-                      <span className="font-semibold">₹{contract.amount}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Request Date:</span>
-                      <span className="font-semibold">{format(new Date(extension.created_at), 'M/dd/yyyy')}</span>
-                    </div>
+                    <StatusBadge status={contract.status} />
                   </div>
 
-                  <div className="mb-3 rounded-lg bg-muted p-3 text-sm">
-                    <div className="mb-1 flex items-center gap-2 font-medium">
-                      <Clock className="h-4 w-4" />
-                      Extension Request:
-                    </div>
-                    <p className="text-muted-foreground">
-                      {contract.borrower?.name} is asking for {extension.extra_days || 5} additional days to repay the loan.
-                    </p>
+                  <div className="mb-3 text-sm">
+                    <p className="text-muted-foreground">New due date: {format(new Date(extension.new_due_at), 'MMM dd, yyyy')}</p>
+                    <p className="text-muted-foreground">Amount: ₹{contract.amount.toLocaleString()}</p>
                     {extension.reason && (
-                      <p className="mt-2 text-sm">
-                        <span className="font-medium">Reason:</span> {extension.reason}
-                      </p>
+                      <p className="text-muted-foreground">Reason: {extension.reason}</p>
                     )}
                   </div>
 
                   <div className="flex gap-2">
                     <Button 
-                      variant="ghost" 
                       size="sm"
-                      onClick={() => navigate(`/contract/${contract.id}`)}
+                      variant="outline"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewContractHistory(contract, extension);
+                      }}
                     >
-                      Review
+                      <Eye className="h-4 w-4 mr-1" />
+                      View Details
                     </Button>
                     <Button 
-                      variant="destructive" 
                       size="sm"
-                      onClick={() => handleExtensionAction(extension.id, false)}
+                      className="flex-1 bg-success hover:bg-success/90"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExtensionAction(extension.id, true);
+                      }}
+                    >
+                      Approve
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExtensionAction(extension.id, false);
+                      }}
                     >
                       Reject
-                    </Button>
-                    <Button 
-                      size="sm"
-                      onClick={() => handleExtensionAction(extension.id, true)}
-                    >
-                      Accept
                     </Button>
                   </div>
                 </Card>
@@ -368,114 +869,200 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Active Contracts & Total Lent */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="p-4">
-            <div className="text-2xl font-bold">{activeContracts.length}</div>
-            <div className="text-sm text-muted-foreground">Active Contracts</div>
-            <div className="mt-1 text-xs text-muted-foreground">ongoing loans</div>
-          </Card>
-          <Card className="bg-success p-4 text-white">
-            <div className="text-2xl font-bold">₹{totalLent}</div>
-            <div className="text-sm">Total Lent</div>
-            <div className="mt-1 text-xs opacity-80">current value</div>
-          </Card>
+        {/* Pending Settlement - Lender needs to validate */}
+        {pendingSettlementAsLender.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              💰 Review Settlement Proofs
+              <span className="text-sm font-normal text-muted-foreground">
+                ({pendingSettlementAsLender.length})
+              </span>
+            </h2>
+            {pendingSettlementAsLender.map((contract) => (
+              <Card key={contract.id} className="p-4 border-success/50 bg-success/5">
+                <div className="mb-3 flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
+                        {contract.borrower ? getInitials(contract.borrower.name) : '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold">{contract.borrower?.name}</h3>
+                      <p className="text-xs text-muted-foreground">Borrower</p>
+                    </div>
+                  </div>
+                  <StatusBadge status={contract.status} />
+                </div>
+                
+                <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <IndianRupee className="h-4 w-4 text-success" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Amount</div>
+                      <div className="font-semibold">₹{contract.amount.toLocaleString('en-IN')}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-success" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Due Date</div>
+                      <div className="font-semibold">{format(new Date(contract.due_at), 'MMM dd, yyyy')}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-success/10 border border-success/30 rounded-md p-3 mb-3">
+                  <p className="text-sm font-medium text-success-foreground">
+                    ✅ {contract.borrower?.name} has uploaded repayment proof. Please verify and confirm!
+                  </p>
         </div>
 
-        {/* Create New Contract & Actions */}
         <Button 
-          className="w-full" 
-          size="lg"
-          onClick={() => navigate('/create-contract')}
-        >
-          <Plus className="mr-2 h-5 w-5" />
-          Create New Contract
-        </Button>
-
-        {/* Invite removed here; use top-right header button instead */}
-
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => navigate('/contracts')}>
-            <FileText className="mr-2 h-4 w-4" />
-            View Contracts
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/search')}>
-            <Search className="mr-2 h-4 w-4" />
-            Search Profiles
-          </Button>
-        </div>
-
-        {/* Recent Contracts */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Recent Contracts</h2>
-          <p className="text-sm text-muted-foreground">Track money you owe to others and money owed to you</p>
-
-          {/* You Owe */}
-          {youOwe.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <span className="text-warning">⚠️ You Owe</span>
-                <span className="text-muted-foreground">• {youOwe.length}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Money you need to pay back</p>
-              {youOwe.map((contract) => (
-                <Card 
-                  key={contract.id} 
-                  className="cursor-pointer p-4 hover:bg-muted/50" 
-                  onClick={() => navigate(`/contract/${contract.id}`)}
+                  size="sm"
+                  className="w-full bg-success hover:bg-success/90"
+                  onClick={() => handleViewProof(contract, 'settlement')}
                 >
-                  <div className="mb-2 flex items-start justify-between">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Review Settlement Proof
+        </Button>
+              </Card>
+            ))}
+        </div>
+        )}
+
+        {/* Pending Settlement - Borrower waiting for lender validation */}
+        {pendingSettlementAsBorrower.length > 0 && (
+        <div className="space-y-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              ⏳ Settlement Under Review
+              <span className="text-sm font-normal text-muted-foreground">
+                ({pendingSettlementAsBorrower.length})
+              </span>
+            </h2>
+            {pendingSettlementAsBorrower.map((contract) => (
+              <Card key={contract.id} className="p-4 border-blue-500/50 bg-blue-50">
+                <div className="mb-3 flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
                           {contract.lender ? getInitials(contract.lender.name) : '?'}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <h3 className="font-semibold">{contract.lender?.name}</h3>
+                      <p className="text-xs text-muted-foreground">Lender</p>
                       </div>
                     </div>
-                    {isOverdue(contract.due_at) ? (
-                      <span className="rounded-full bg-destructive px-2 py-0.5 text-xs font-medium text-white">
-                        {getDaysOverdue(contract.due_at)} days overdue
-                      </span>
-                    ) : (
                       <StatusBadge status={contract.status} />
-                    )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                
+                <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
                     <div className="flex items-center gap-2">
                       <IndianRupee className="h-4 w-4 text-primary" />
-                      <span className="font-semibold">₹{contract.amount}</span>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Amount</div>
+                      <div className="font-semibold">₹{contract.amount.toLocaleString('en-IN')}</div>
+                    </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold">{format(new Date(contract.due_at), 'MM/dd/yyyy')}</span>
+                    <Calendar className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Due Date</div>
+                      <div className="font-semibold">{format(new Date(contract.due_at), 'MMM dd, yyyy')}</div>
+                    </div>
                     </div>
                   </div>
-                  {contract.reason && (
-                    <p className="mt-2 text-sm text-muted-foreground">{contract.reason}</p>
-                  )}
-                  <div className="mt-3 flex gap-2">
-                    {contract.extension_pending ? (
-                      <Button size="sm" variant="outline" className="flex-1">
-                        Pending Time Approval
-                      </Button>
-                    ) : (
+                
+                <div className="bg-blue-100 border border-blue-300 rounded-md p-3 mb-3">
+                  <p className="text-sm font-medium text-blue-900">
+                    ✅ You uploaded settlement proof. Waiting for {contract.lender?.name} to confirm receipt.
+                  </p>
+                </div>
+                
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        className="flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                  className="w-full"
+                  onClick={() => {
                           setActiveContract(contract);
-                          setShowExtensionDialog(true);
+                    setProofType('settlement');
+                    setShowValidateProofDialog(true);
                         }}
                       >
-                        <Clock className="mr-2 h-4 w-4" />
-                        Ask for Time
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Your Uploaded Proof
                       </Button>
-                    )}
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Active Contracts */}
+        {activeContracts.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold">Active Contracts ({activeContracts.length})</h2>
+            {activeContracts.map((contract) => (
+              <Card key={contract.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleViewContractDetails(contract)}>
+                <div className="mb-3 flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
+                        {contract.borrower_id === currentUserId 
+                          ? (contract.lender ? getInitials(contract.lender.name) : '?')
+                          : (contract.borrower ? getInitials(contract.borrower.name) : '?')
+                        }
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold">
+                        {contract.borrower_id === currentUserId 
+                          ? contract.lender?.name 
+                          : contract.borrower?.name
+                        }
+                      </h3>
+                      <div className="text-xs text-muted-foreground">
+                        {contract.borrower_id === currentUserId ? 'You owe' : 'They owe you'}
+                      </div>
+                      {/* Show trust score for borrowers */}
+                      {contract.borrower_id !== currentUserId && contract.borrower?.trust_reliability_cached !== null && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <ReliabilityStars score={contract.borrower.trust_reliability_cached} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <StatusBadge status={contract.status} />
+                </div>
+                
+                <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <IndianRupee className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Amount</div>
+                      <div className="font-semibold">₹{contract.amount}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Due</div>
+                      <div className="font-semibold">{format(new Date(contract.due_at), 'MMM dd, yyyy')}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                {contract.status === 'DUE' && isOverdue(contract.due_at) && (
+                  <div className="mb-3 p-2 bg-destructive/10 rounded-md">
+                    <p className="text-sm text-destructive font-medium">
+                      Overdue by {getDaysOverdue(contract.due_at)} days
+                    </p>
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  {contract.borrower_id === currentUserId && contract.status === 'ACTIVE' && (
+                    <>
                     {contract.settlement_pending ? (
                       <Button 
                         size="sm" 
@@ -483,7 +1070,6 @@ export default function Dashboard() {
                         className="flex-1"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setActiveContract(contract);
                           setShowProofDialog(true);
                         }}
                       >
@@ -495,76 +1081,39 @@ export default function Dashboard() {
                         className="flex-1 bg-success hover:bg-success/90"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setActiveContract(contract);
-                          setShowSettleDialog(true);
+                            handleInitiateSettlement(contract);
                         }}
                       >
-                        Settle Up
+                          Mark as Paid & Upload Proof
                       </Button>
                     )}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {/* They Owe You */}
-          {theyOweYou.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <span className="text-success">💰 They Owe You</span>
-                <span className="text-muted-foreground">• {theyOweYou.length}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Money others need to pay back to you</p>
-              {theyOweYou.map((contract) => (
-                <Card 
-                  key={contract.id} 
-                  className="cursor-pointer p-4 hover:bg-muted/50" 
-                  onClick={() => navigate(`/contract/${contract.id}`)}
-                >
-                  <div className="mb-2 flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                          {contract.borrower ? getInitials(contract.borrower.name) : '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="font-semibold">{contract.borrower?.name}</h3>
-                      </div>
-                    </div>
-                    {isOverdue(contract.due_at) ? (
-                      <span className="rounded-full bg-destructive px-2 py-0.5 text-xs font-medium text-white">
-                        {getDaysOverdue(contract.due_at)} days overdue
-                      </span>
-                    ) : (
-                      <StatusBadge status={contract.status} />
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <IndianRupee className="h-4 w-4 text-primary" />
-                      <span className="font-semibold">₹{contract.amount}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold">{format(new Date(contract.due_at), 'MM/dd/yyyy')}</span>
-                    </div>
-                  </div>
-                  {contract.reason && (
-                    <p className="mt-2 text-sm text-muted-foreground">{contract.reason}</p>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveContract(contract);
+                          setShowExtensionDialog(true);
+                        }}
+                      >
+                        <Clock className="mr-2 h-4 w-4" />
+                        Request Extension
+                      </Button>
+                    </>
                   )}
-                  <div className="mt-3 flex gap-2">
-                    <Button size="sm" variant="outline" className="flex-1">
-                      Send Reminder
-                    </Button>
-                        {(contract.settlement_pending || contract.repayment_proof_url) ? (
-                      <Button size="sm" className="bg-success hover:bg-success/90 flex-1" onClick={(e) => { e.stopPropagation(); setActiveContract(contract); setShowProofDialog(true); }}>
-                        Review Proof
-                      </Button>
-                    ) : (
-                      <Button size="sm" className="bg-primary hover:bg-primary/90 flex-1" onClick={(e) => { e.stopPropagation(); navigate(`/contract/${contract.id}`); }}>
-                        Awaiting Proof
+                  
+                  {contract.lender_id === currentUserId && contract.status === 'PENDING_SETTLEMENT' && contract.settlement_pending && (
+                    <Button 
+                      size="sm" 
+                      className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewProof(contract, 'settlement');
+                      }}
+                    >
+                      <Eye className="mr-1 h-3 w-3" />
+                      Review Settlement Proof
                       </Button>
                     )}
                   </div>
@@ -572,30 +1121,77 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
       </main>
-      {/* Global dialogs for borrower actions */}
-      {activeContract && (
-        <>
+
           <ExtensionRequestDialog
             open={showExtensionDialog}
-            onOpenChange={(open) => { setShowExtensionDialog(open); if (!open) setActiveContract(null); }}
+        onOpenChange={setShowExtensionDialog}
             onSubmit={handleExtensionSubmit}
-            currentDueDate={activeContract.due_at}
-          />
-          <SettleUpDialog
-            open={showSettleDialog}
-            onOpenChange={(open) => { setShowSettleDialog(open); if (!open) setActiveContract(null); }}
-            onUpload={handleSettleUpload}
-          />
-          <ProofViewerDialog
-            open={showProofDialog}
-            onOpenChange={(open) => { setShowProofDialog(open); if (!open) setActiveContract(null); }}
-            imageUrl={activeContract.repayment_proof_url || activeContract.disbursal_proof_url}
-          />
-        </>
-      )}
-      <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+        currentDueDate={getValidDueDate()}
+      />
+
+      <PaymentProofDialog
+        open={showPaymentProofDialog}
+        onOpenChange={setShowPaymentProofDialog}
+        onSubmit={handlePaymentProofSubmit}
+        title={proofType === 'disbursal' ? '💳 Upload Payment Proof' : '💰 Upload Settlement Proof'}
+        description={
+          proofType === 'disbursal'
+            ? `Upload proof of payment to ${activeContract?.borrower?.name || 'borrower'}`
+            : `Upload proof of repayment to ${activeContract?.lender?.name || 'lender'}`
+        }
+      />
+
+      <ValidateProofDialog
+        open={showValidateProofDialog}
+        onOpenChange={setShowValidateProofDialog}
+        proofUrl={
+          proofType === 'disbursal'
+            ? (activeContract?.disbursal_proof_url || '')
+            : (activeContract?.repayment_proof_url || '')
+        }
+        proofType={proofType}
+        userName={
+          proofType === 'disbursal'
+            ? (activeContract?.lender?.name || 'Lender')
+            : (activeContract?.borrower?.name || 'Borrower')
+        }
+        amount={activeContract?.amount || 0}
+        onValidate={handleValidateProof}
+        viewOnly={
+          // View only if you're the one who uploaded the proof
+          proofType === 'disbursal'
+            ? activeContract?.lender_id === currentUserId
+            : activeContract?.borrower_id === currentUserId
+        }
+      />
+
+      <ReviewDialog
+        open={showReviewDialog}
+        onOpenChange={setShowReviewDialog}
+        onSubmit={handleReviewSubmit}
+        borrowerName={activeContract?.borrower?.name || 'Borrower'}
+      />
+
+      <InviteDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+      />
+
+      <ContractHistoryDialog
+        open={showContractHistoryDialog}
+        onOpenChange={setShowContractHistoryDialog}
+        contract={activeContract}
+        extension={activeExtension}
+      />
+
+      <ContractDetailsDialog
+        open={showContractDetailsDialog}
+        onOpenChange={setShowContractDetailsDialog}
+        contract={activeContract}
+        showActions={true}
+        userRole={activeContract?.borrower_id === currentUserId ? 'borrower' : activeContract?.lender_id === currentUserId ? 'lender' : 'viewer'}
+      />
     </div>
   );
 }

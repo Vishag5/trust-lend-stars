@@ -1,0 +1,17 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="128" fill="#6366f1"/>
+  
+  <!-- Star icon (trust/reliability) -->
+  <path d="M256 120L283.2 201.6L368 208L304 268.8L321.6 352L256 312L190.4 352L208 268.8L144 208L228.8 201.6L256 120Z" fill="#FBBF24" stroke="#FCD34D" stroke-width="4"/>
+  
+  <!-- Handshake/coins icon -->
+  <circle cx="200" cy="320" r="40" fill="#F3F4F6" stroke="#E5E7EB" stroke-width="4"/>
+  <circle cx="312" cy="320" r="40" fill="#F3F4F6" stroke="#E5E7EB" stroke-width="4"/>
+  <path d="M200 360 L200 400 L220 420 L256 420 L292 420 L312 400 L312 360" fill="none" stroke="#F3F4F6" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- Letters "LT" -->
+  <text x="256" y="460" font-family="Arial, sans-serif" font-size="80" font-weight="bold" fill="white" text-anchor="middle">LT</text>
+</svg>
+
+

@@ -7,27 +7,31 @@
     "TailwindCSS",
     "shadcn/ui",
     "TanStack Query",
-    "LocalStorage (mock data client)",
-    "date-fns"
+    "LocalStorage",
+    "date-fns",
+    "React Router",
+    "Lucide React",
+    "PWA (Progressive Web App)"
   ],
   "features": [
     {
       "name": "App Routing",
-      "description": "SPA routing across login, dashboard, contracts, create, contract detail, profile, search, user profile, not found.",
+      "description": "SPA routing across login, dashboard, contracts, create contract, contract detail, profile, search, user profile, analytics, settings, help, and not found pages",
       "files": [
-        "src/App.tsx"
+        "src/App.tsx",
+        "src/main.tsx"
       ]
     },
     {
-      "name": "Auth Store",
-      "description": "Zustand store for current user and logout.",
+      "name": "Authentication Store",
+      "description": "Zustand store for current user management and logout functionality",
       "files": [
         "src/store/authStore.ts"
       ]
     },
     {
       "name": "Mock Data Client",
-      "description": "LocalStorage-backed client for users, contracts, extensions, reviews, reminders.",
+      "description": "LocalStorage-backed client for users, contracts, extensions, reviews, and reminders with full CRUD operations",
       "files": [
         "src/lib/dataClient.ts",
         "src/lib/seedData.ts"
@@ -35,28 +39,28 @@
     },
     {
       "name": "Dashboard",
-      "description": "Overview with loan requests, extension requests, active metrics, actions, and borrower/lender sections.",
+      "description": "Comprehensive overview with loan requests, extension requests, active metrics, actions, payment proof workflows, and borrower/lender sections",
       "files": [
         "src/pages/Dashboard.tsx"
       ]
     },
     {
       "name": "Create Contract",
-      "description": "Form to request a loan with lender phone, amount, reason, date+time pickers.",
+      "description": "Form to request a loan with lender phone, amount, reason, date+time pickers, and validation",
       "files": [
         "src/pages/CreateContract.tsx"
       ]
     },
     {
       "name": "Contract Detail",
-      "description": "Detailed view with Accept/Reject (lender), Ask for Extension/Settle Up (borrower), proof viewer.",
+      "description": "Detailed view with Accept/Reject (lender), Ask for Extension/Settle Up (borrower), and proof viewer",
       "files": [
         "src/pages/ContractDetail.tsx"
       ]
     },
     {
       "name": "Contracts List",
-      "description": "Tabbed list of all, active, settled with reusable ContractCard actions.",
+      "description": "Tabbed list of all, active, settled contracts with reusable ContractCard actions",
       "files": [
         "src/pages/Contracts.tsx",
         "src/components/ContractCard.tsx"
@@ -64,48 +68,86 @@
     },
     {
       "name": "Profiles and Search",
-      "description": "User profile, search connected profiles, user profile view with stats and reviews.",
+      "description": "User profile pages (borrower/lender), search profiles, and user switcher functionality",
       "files": [
         "src/pages/Profile.tsx",
+        "src/pages/BorrowerProfile.tsx",
+        "src/pages/LenderProfile.tsx",
+        "src/pages/UserProfile.tsx",
         "src/pages/SearchProfiles.tsx",
-        "src/pages/UserProfile.tsx"
+        "src/components/UserSwitcher.tsx"
       ]
     },
     {
-      "name": "Extension Request Dialog",
-      "description": "Choose new due date and time with reason; required; auto-close behaviors.",
+      "name": "Payment Proof System",
+      "description": "Upload and validate payment proofs for disbursal and settlement with image preview and validation",
       "files": [
-        "src/components/ExtensionRequestDialog.tsx"
-      ]
-    },
-    {
-      "name": "Settle Up & Proof Viewer",
-      "description": "Dialog to upload repayment proof (data URL) and viewer to display proof to both parties.",
-      "files": [
-        "src/components/SettleUpDialog.tsx",
+        "src/components/PaymentProofDialog.tsx",
+        "src/components/ValidateProofDialog.tsx",
         "src/components/ProofViewerDialog.tsx"
       ]
     },
     {
-      "name": "Invite Friends",
-      "description": "Header invite opens multi-platform share dialog with copy link.",
+      "name": "Contract Management",
+      "description": "Extension requests, settlement dialogs, and contract status management",
       "files": [
-        "src/components/MobileHeader.tsx",
-        "src/components/InviteDialog.tsx"
+        "src/components/ExtensionRequestDialog.tsx",
+        "src/components/SettleUpDialog.tsx",
+        "src/components/StatusBadge.tsx"
       ]
     },
     {
-      "name": "UI & Utilities",
-      "description": "UI primitives, status badges, reliability stars, formatters.",
+      "name": "Review System",
+      "description": "Rate and review borrowers with reliability score calculation and display",
       "files": [
-        "src/components/ui/*",
-        "src/components/StatusBadge.tsx",
-        "src/components/ReliabilityStars.tsx",
+        "src/components/ReviewDialog.tsx",
+        "src/components/ReliabilityStars.tsx"
+      ]
+    },
+    {
+      "name": "UI Components",
+      "description": "Reusable UI components including mobile header, invite dialog, and status badges",
+      "files": [
+        "src/components/MobileHeader.tsx",
+        "src/components/InviteDialog.tsx",
+        "src/components/ui/"
+      ]
+    },
+    {
+      "name": "Additional Pages",
+      "description": "Analytics, settings, help pages for comprehensive app functionality",
+      "files": [
+        "src/pages/Analytics.tsx",
+        "src/pages/Settings.tsx",
+        "src/pages/Help.tsx",
+        "src/pages/NotFound.tsx"
+      ]
+    },
+    {
+      "name": "PWA Features",
+      "description": "Progressive Web App with manifest, service worker, mobile-first design, and app-like experience",
+      "files": [
+        "public/manifest.json",
+        "index.html",
+        "src/index.css"
+      ]
+    },
+    {
+      "name": "Data Utilities",
+      "description": "Utility functions for formatting, reliability calculation, and data management",
+      "files": [
         "src/lib/format.ts",
-        "src/lib/reliability.ts"
+        "src/lib/reliability.ts",
+        "src/lib/utils.ts"
+      ]
+    },
+    {
+      "name": "Hooks",
+      "description": "Custom React hooks for mobile detection and toast notifications",
+      "files": [
+        "src/hooks/use-mobile.tsx",
+        "src/hooks/use-toast.ts"
       ]
     }
   ]
 }
-
-

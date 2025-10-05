@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { UserSwitcher } from './UserSwitcher';
-import { Share2, ArrowLeft, Menu } from 'lucide-react';
+import { Share2, ArrowLeft, Menu, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { InviteDialog } from '@/components/InviteDialog';
@@ -13,7 +13,7 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ title, showBack = false }: MobileHeaderProps) {
-  const { currentUser } = useAuthStore();
+  const { currentUser, logout } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -25,6 +25,15 @@ export function MobileHeader({ title, showBack = false }: MobileHeaderProps) {
 
   const handleBack = () => {
     navigate(-1);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+    toast({
+      title: 'Logged out',
+      description: 'You have been successfully logged out',
+    });
   };
 
   const isDashboard = location.pathname === '/dashboard';
@@ -60,6 +69,15 @@ export function MobileHeader({ title, showBack = false }: MobileHeaderProps) {
               Invite Friends
             </Button>
           )}
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className="text-white hover:bg-white/10"
+            onClick={handleLogout}
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
           <UserSwitcher />
         </div>
       </div>
