@@ -1,36 +1,52 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/store/authStore';
 import { getDataClient } from '@/lib/dataClient';
 import { seedDemoData, DEMO_USERS } from '@/lib/seedData';
 import { useToast } from '@/hooks/use-toast';
-import { User } from 'lucide-react';
+import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
+import { PhoneAuthForm } from '@/components/auth/PhoneAuthForm';
+import { UserOnboarding } from '@/components/auth/UserOnboarding';
+import { User, Chrome, Phone, Shield } from 'lucide-react';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser } = useAuthStore();
+  const { currentUser, setCurrentUser, isAuthenticated, checkAuth } = useAuthStore();
   const { toast } = useToast();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [authUser, setAuthUser] = useState<any>(null);
+  
+  // Feature flags
+  const isDemoMode = useFeatureFlag('guestAccess');
+  const showDebugInfo = useFeatureFlag('debugPanel');
 
   useEffect(() => {
-    // Seed demo data on first load
-    const initializeData = async () => {
-      console.log('Login: Initializing seed data...');
-      try {
-        await seedDemoData();
-        console.log('Login: Seed data initialized successfully');
-      } catch (error) {
-        console.error('Login: Error seeding data:', error);
-      }
-    };
-    initializeData();
+    // Check authentication status
+    checkAuth();
+    
+    // Seed demo data on first load (only in demo mode)
+    if (isDemoMode) {
+      const initializeData = async () => {
+        console.log('Login: Initializing seed data...');
+        try {
+          await seedDemoData();
+          console.log('Login: Seed data initialized successfully');
+        } catch (error) {
+          console.error('Login: Error seeding data:', error);
+        }
+      };
+      initializeData();
+    }
 
     // If already logged in, go to dashboard
-    if (currentUser) {
+    if (isAuthenticated && currentUser) {
       navigate('/dashboard');
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, isAuthenticated, navigate, checkAuth, isDemoMode]);
 
   const handleUserSelect = async (phone: string, name: string) => {
     try {
@@ -53,6 +69,41 @@ export default function Login() {
       });
     }
   };
+
+  const handleAuthSuccess = (user: any) => {
+    setAuthUser(user);
+    setShowOnboarding(true);
+  };
+
+  const handleOnboardingComplete = (userData: any) => {
+    setCurrentUser(userData);
+    setShowOnboarding(false);
+    toast({
+      title: 'Welcome to LenTrust!',
+      description: 'Your profile has been created successfully',
+    });
+    navigate('/dashboard');
+  };
+
+  // Show onboarding if user just authenticated
+  if (showOnboarding && authUser) {
+    return (
+      <div className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-gradient-to-br from-primary/10 via-background to-background px-4 sm:px-6">
+        <UserOnboarding
+          user={authUser}
+          onComplete={handleOnboardingComplete}
+          onError={(error) => {
+            toast({
+              title: 'Error',
+              description: error.message || 'Failed to create profile',
+              variant: 'destructive',
+            });
+          }}
+          className="w-full max-w-md"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-gradient-to-br from-primary/10 via-background to-background px-4 sm:px-6">
@@ -77,59 +128,117 @@ export default function Login() {
           <p className="text-sm sm:text-base text-muted-foreground">Peer-to-peer lending with accountability</p>
         </div>
 
-        <div className="space-y-4">
-          <p className="text-center text-sm text-muted-foreground">
-            Select a demo user to continue
-          </p>
+        {isDemoMode ? (
+          // Demo Mode - Show demo users
+          <div className="space-y-4">
+            <p className="text-center text-sm text-muted-foreground">
+              Select a demo user to continue
+            </p>
 
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-auto py-4 sm:py-5 hover:bg-primary/5 transition-all active:scale-[0.98]"
-              onClick={() => handleUserSelect(DEMO_USERS.BORROWER_A.phone, DEMO_USERS.BORROWER_A.name)}
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <div className="text-left flex-1">
-                <div className="font-semibold text-base">{DEMO_USERS.BORROWER_A.name}</div>
-                <div className="text-xs text-muted-foreground">{DEMO_USERS.BORROWER_A.phone}</div>
-              </div>
-            </Button>
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3 h-auto py-4 sm:py-5 hover:bg-primary/5 transition-all active:scale-[0.98]"
+                onClick={() => handleUserSelect(DEMO_USERS.BORROWER_A.phone, DEMO_USERS.BORROWER_A.name)}
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-base">{DEMO_USERS.BORROWER_A.name}</div>
+                  <div className="text-xs text-muted-foreground">{DEMO_USERS.BORROWER_A.phone}</div>
+                </div>
+              </Button>
 
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-auto py-4 sm:py-5 hover:bg-primary/5 transition-all active:scale-[0.98]"
-              onClick={() => handleUserSelect(DEMO_USERS.BORROWER_B.phone, DEMO_USERS.BORROWER_B.name)}
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <div className="text-left flex-1">
-                <div className="font-semibold text-base">{DEMO_USERS.BORROWER_B.name}</div>
-                <div className="text-xs text-muted-foreground">{DEMO_USERS.BORROWER_B.phone}</div>
-              </div>
-            </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3 h-auto py-4 sm:py-5 hover:bg-primary/5 transition-all active:scale-[0.98]"
+                onClick={() => handleUserSelect(DEMO_USERS.BORROWER_B.phone, DEMO_USERS.BORROWER_B.name)}
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-base">{DEMO_USERS.BORROWER_B.name}</div>
+                  <div className="text-xs text-muted-foreground">{DEMO_USERS.BORROWER_B.phone}</div>
+                </div>
+              </Button>
 
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-auto py-4 sm:py-5 hover:bg-primary/5 transition-all active:scale-[0.98]"
-              onClick={() => handleUserSelect(DEMO_USERS.LENDER_L1.phone, DEMO_USERS.LENDER_L1.name)}
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <div className="text-left flex-1">
-                <div className="font-semibold text-base">{DEMO_USERS.LENDER_L1.name}</div>
-                <div className="text-xs text-muted-foreground">{DEMO_USERS.LENDER_L1.phone}</div>
-              </div>
-            </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3 h-auto py-4 sm:py-5 hover:bg-primary/5 transition-all active:scale-[0.98]"
+                onClick={() => handleUserSelect(DEMO_USERS.LENDER_L1.phone, DEMO_USERS.LENDER_L1.name)}
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-base">{DEMO_USERS.LENDER_L1.name}</div>
+                  <div className="text-xs text-muted-foreground">{DEMO_USERS.LENDER_L1.phone}</div>
+                </div>
+              </Button>
+            </div>
+
+            <p className="text-center text-xs text-muted-foreground pt-2">
+              Demo app • All data is stored locally
+            </p>
           </div>
-        </div>
+        ) : (
+          // Production Mode - Show authentication options
+          <Tabs defaultValue="google" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="google" className="flex items-center gap-2">
+                <Chrome className="h-4 w-4" />
+                Google
+              </TabsTrigger>
+              <TabsTrigger value="phone" className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Phone
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="google" className="space-y-4">
+              <div className="text-center space-y-2">
+                <Shield className="h-8 w-8 mx-auto text-primary" />
+                <h3 className="text-lg font-semibold">Sign in with Google</h3>
+                <p className="text-sm text-muted-foreground">
+                  Quick and secure authentication
+                </p>
+              </div>
+              <GoogleAuthButton
+                onSuccess={handleAuthSuccess}
+                onError={(error) => {
+                  toast({
+                    title: 'Authentication Error',
+                    description: error.message || 'Google sign-in failed',
+                    variant: 'destructive',
+                  });
+                }}
+              />
+            </TabsContent>
+            
+            <TabsContent value="phone" className="space-y-4">
+              <PhoneAuthForm
+                onSuccess={handleAuthSuccess}
+                onError={(error) => {
+                  toast({
+                    title: 'Authentication Error',
+                    description: error.message || 'Phone authentication failed',
+                    variant: 'destructive',
+                  });
+                }}
+              />
+            </TabsContent>
+          </Tabs>
+        )}
 
-        <p className="text-center text-xs text-muted-foreground pt-2">
-          Demo app • All data is stored locally
-        </p>
+        {showDebugInfo && (
+          <div className="mt-4 p-3 bg-muted rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              <strong>Debug Info:</strong> Demo Mode: {isDemoMode ? 'ON' : 'OFF'}
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );
