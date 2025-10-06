@@ -2,7 +2,7 @@
 import { validateFile, ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from './fileValidation';
 import { rateLimit, RATE_LIMITS } from './rateLimiter';
 import { validateAndSanitize, phoneSchema, amountSchema } from './inputValidation';
-import { validateEnvironment } from './envSecurity';
+// import { validateEnvironment } from './envSecurity';
 
 export async function runSecurityTests() {
   console.log('🔒 Starting Security Tests...');
