@@ -38,11 +38,11 @@ export default function Dashboard() {
   const { currentUserId } = useAuthStore();
   const { toast } = useToast();
   
-  // Feature flags
-  const showSecurityTests = useSecurityTests();
-  const showUIUXTests = useUIUXTests();
-  const showDebugPanel = useDebugPanel();
-  const isDemo = useIsDemoMode();
+  // Feature flags - HARDCODED FOR PHASE 2 DEMO
+  const showSecurityTests = true; // Hardcoded for demo
+  const showUIUXTests = true; // Hardcoded for demo
+  const showDebugPanel = true; // Hardcoded for demo
+  const isDemo = true; // Hardcoded for demo
   
   // Debug logging
   console.log('🔍 Dashboard Feature Flags:', {
