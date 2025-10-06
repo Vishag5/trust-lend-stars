@@ -34,18 +34,31 @@ export function PaymentProofDialog({
   const [notes, setNotes] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    
+    // Import file validation
+    const { validateFile } = await import('@/lib/fileValidation');
+    
+    // Validate file security
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      // Show error toast (you'll need to import useToast)
+      console.error('File validation failed:', validation.error);
+      return;
     }
+    
+    // Use sanitized file
+    const secureFile = validation.sanitizedFile || file;
+    setSelectedFile(secureFile);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result as string);
+    };
+    reader.readAsDataURL(secureFile);
   };
 
   const handleSubmit = async () => {

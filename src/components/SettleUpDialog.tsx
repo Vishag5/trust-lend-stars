@@ -16,12 +16,25 @@ export function SettleUpDialog({ open, onOpenChange, onUpload }: SettleUpDialogP
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Import file validation
+    const { validateFile } = await import('@/lib/fileValidation');
+    
+    // Validate file security
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      console.error('File validation failed:', validation.error);
+      return;
+    }
+    
+    // Use sanitized file
+    const secureFile = validation.sanitizedFile || file;
     const reader = new FileReader();
     reader.onload = () => {
       const result = typeof reader.result === 'string' ? reader.result : null;
       setPreviewUrl(result);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(secureFile);
   };
 
   const handleSubmit = () => {

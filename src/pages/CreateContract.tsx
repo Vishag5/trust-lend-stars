@@ -148,7 +148,23 @@ export default function CreateContract() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    setAttachedFile(file);
+    // Import file validation
+    const { validateFile } = await import('@/lib/fileValidation');
+    
+    // Validate file security
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      toast({
+        title: 'Invalid file',
+        description: validation.error,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Use sanitized file
+    const secureFile = validation.sanitizedFile || file;
+    setAttachedFile(secureFile);
     
     // Create preview URL
     const reader = new FileReader();
@@ -156,7 +172,7 @@ export default function CreateContract() {
       const result = typeof reader.result === 'string' ? reader.result : null;
       setFilePreview(result);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(secureFile);
   };
 
   const removeFile = () => {
