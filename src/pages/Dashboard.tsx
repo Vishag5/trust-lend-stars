@@ -12,6 +12,7 @@ import { ProofViewerDialog } from '@/components/ProofViewerDialog';
 import { PaymentProofDialog } from '@/components/PaymentProofDialog';
 import { ValidateProofDialog } from '@/components/ValidateProofDialog';
 import { ReviewDialog } from '@/components/ReviewDialog';
+// import { SecurityTestRunner } from '@/components/SecurityTestRunner';
 import { Plus, Search, FileText, Clock, User, Calendar, IndianRupee, Share2, BarChart3, Settings, HelpCircle, UserCircle, Eye } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ReliabilityStars } from '@/components/ReliabilityStars';
@@ -24,6 +25,7 @@ import { ContractDetailsDialog } from '@/components/ContractDetailsDialog';
 import { ReminderManager } from '@/components/ReminderManager';
 import { NotificationBell } from '@/components/NotificationBell';
 import { InAppNotification } from '@/components/InAppNotification';
+import { SecurityTestPanel } from '@/components/SecurityTestPanel';
 import { reminderService } from '@/lib/reminderService';
 import { notificationService } from '@/lib/notificationService';
 
@@ -455,25 +457,30 @@ export default function Dashboard() {
       <main className="flex-1 space-y-4 px-4 sm:px-6 py-6 pb-safe overflow-y-auto">
         {/* Development Tools */}
         {process.env.NODE_ENV === 'development' && (
-          <div className="bg-muted/50 border border-dashed rounded-md p-3 mb-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm">
-                <p className="font-semibold">Development Mode</p>
-                <p className="text-xs text-muted-foreground">Demo data with payment proofs</p>
+          <div className="space-y-4 mb-4">
+            <div className="bg-muted/50 border border-dashed rounded-md p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <p className="font-semibold">Development Mode</p>
+                  <p className="text-xs text-muted-foreground">Demo data with payment proofs</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('This will reset all data and reload with fresh demo data including payment proofs. Continue?')) {
+                      localStorage.clear();
+                      window.location.reload();
+                    }
+                  }}
+                >
+                  Reset Demo Data
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (confirm('This will reset all data and reload with fresh demo data including payment proofs. Continue?')) {
-                    localStorage.clear();
-                    window.location.reload();
-                  }
-                }}
-              >
-                Reset Demo Data
-              </Button>
             </div>
+            
+            {/* Security Test Panel */}
+            <SecurityTestPanel />
           </div>
         )}
 
@@ -1277,6 +1284,11 @@ export default function Dashboard() {
 
       {/* Fallback In-App Notifications for iOS Chrome */}
       <InAppNotification userId={currentUserId} />
+      
+      {/* Security Test Runner - Only show in demo mode */}
+      {/* {process.env.NODE_ENV === 'development' && (
+        <SecurityTestRunner />
+      )} */}
     </div>
   );
 }
