@@ -55,6 +55,13 @@ export default function Dashboard() {
     uiuxTests: import.meta.env.VITE_ENABLE_UIUX_TESTS
   });
   
+  console.log('🔍 Environment Variables:', {
+    VITE_APP_MODE: import.meta.env.VITE_APP_MODE,
+    VITE_ENABLE_SECURITY_TESTS: import.meta.env.VITE_ENABLE_SECURITY_TESTS,
+    VITE_ENABLE_UIUX_TESTS: import.meta.env.VITE_ENABLE_UIUX_TESTS,
+    VITE_ENABLE_DEBUG_PANEL: import.meta.env.VITE_ENABLE_DEBUG_PANEL
+  });
+  
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
@@ -493,7 +500,7 @@ export default function Dashboard() {
       
       <main className="flex-1 space-y-4 px-4 sm:px-6 py-6 pb-safe overflow-y-auto">
         {/* Development Tools */}
-        {import.meta.env.MODE === 'development' && (
+        {(import.meta.env.MODE === 'development' || import.meta.env.MODE === 'demo') && (
           <div className="space-y-4 mb-4">
             <div className="bg-muted/50 border border-dashed rounded-md p-3">
               <div className="flex items-center justify-between">
