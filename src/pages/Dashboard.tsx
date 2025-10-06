@@ -28,6 +28,7 @@ import { InAppNotification } from '@/components/InAppNotification';
 import { SecurityTestPanel } from '@/components/SecurityTestPanel';
 import { UIUXTestSuite } from '@/components/UIUXTestSuite';
 import { LoadingSpinner, LoadingOverlay } from '@/components/LoadingSpinner';
+import { useSecurityTests, useUIUXTests, useDebugPanel, useIsDemoMode } from '@/hooks/useFeatureFlag';
 import { ErrorBoundary, ErrorMessage } from '@/components/ErrorBoundary';
 import { reminderService } from '@/lib/reminderService';
 import { notificationService } from '@/lib/notificationService';
@@ -36,6 +37,12 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
   const { toast } = useToast();
+  
+  // Feature flags
+  const showSecurityTests = useSecurityTests();
+  const showUIUXTests = useUIUXTests();
+  const showDebugPanel = useDebugPanel();
+  const isDemo = useIsDemoMode();
   
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [extensions, setExtensions] = useState<Extension[]>([]);
@@ -498,11 +505,11 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {/* Security Test Panel */}
-            <SecurityTestPanel />
+            {/* Security Test Panel - Only in demo mode */}
+            {showSecurityTests && <SecurityTestPanel />}
             
-            {/* UI/UX Test Suite */}
-            <UIUXTestSuite />
+            {/* UI/UX Test Suite - Only in demo mode */}
+            {showUIUXTests && <UIUXTestSuite />}
           </div>
         )}
 
