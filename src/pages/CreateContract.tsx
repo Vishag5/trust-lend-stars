@@ -53,22 +53,26 @@ export default function CreateContract() {
       return;
     }
 
-    // Phone number validation
-    const phoneRegex = /^\+91\s?\d{10}$/;
-    if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
+    // Secure phone number validation
+    const { validateAndSanitize, phoneSchema } = await import('@/lib/inputValidation');
+    const phoneValidation = validateAndSanitize(phoneSchema, phone);
+    if (!phoneValidation.success) {
       toast({
         title: 'Invalid phone number',
-        description: 'Please enter a valid Indian phone number (+91 followed by 10 digits)',
+        description: phoneValidation.error,
         variant: 'destructive',
       });
       return;
     }
 
+    // Secure amount validation
     const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum < 100) {
+    const { amountSchema } = await import('@/lib/inputValidation');
+    const amountValidation = validateAndSanitize(amountSchema, amountNum);
+    if (!amountValidation.success) {
       toast({
         title: 'Invalid amount',
-        description: 'Amount must be at least ₹100',
+        description: amountValidation.error,
         variant: 'destructive',
       });
       return;
