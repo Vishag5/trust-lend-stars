@@ -27,6 +27,8 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { InAppNotification } from '@/components/InAppNotification';
 import { SecurityTestPanel } from '@/components/SecurityTestPanel';
 import { UIUXTestSuite } from '@/components/UIUXTestSuite';
+import { LoadingSpinner, LoadingOverlay } from '@/components/LoadingSpinner';
+import { ErrorBoundary, ErrorMessage } from '@/components/ErrorBoundary';
 import { reminderService } from '@/lib/reminderService';
 import { notificationService } from '@/lib/notificationService';
 
@@ -368,7 +370,7 @@ export default function Dashboard() {
       <div className="flex min-h-screen min-h-[100dvh] flex-col bg-background">
         <MobileHeader />
         <main className="flex flex-1 items-center justify-center">
-          <p className="text-muted-foreground">Loading...</p>
+          <LoadingSpinner size="lg" text="Loading your dashboard..." />
         </main>
       </div>
     );
@@ -445,7 +447,8 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen-safe min-h-screen-safe flex-col bg-muted/30">
+    <ErrorBoundary>
+      <div className="flex h-screen-safe min-h-screen-safe flex-col bg-muted/30">
       <MobileHeader 
         rightElement={
           <NotificationBell 
@@ -1295,6 +1298,7 @@ export default function Dashboard() {
       {/* {import.meta.env.MODE === 'development' && (
         <SecurityTestRunner />
       )} */}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
