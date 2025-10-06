@@ -53,6 +53,7 @@ export default function Dashboard() {
   const [activeContract, setActiveContract] = useState<Contract | null>(null);
   const [activeExtension, setActiveExtension] = useState<Extension | null>(null);
   const [showReminderManager, setShowReminderManager] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -122,9 +123,10 @@ export default function Dashboard() {
       }
       setExtensions(allExtensions);
     } catch (error) {
+      console.error('Error loading data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load data',
+        description: 'Failed to load data. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -133,10 +135,15 @@ export default function Dashboard() {
   };
 
   const handleAccept = async (contract: Contract) => {
-    // Set the active contract and show payment proof dialog
-    setActiveContract(contract);
-    setProofType('disbursal');
-    setShowPaymentProofDialog(true);
+    setActionLoading(`accept-${contract.id}`);
+    try {
+      // Set the active contract and show payment proof dialog
+      setActiveContract(contract);
+      setProofType('disbursal');
+      setShowPaymentProofDialog(true);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handlePaymentProofSubmit = async (proofUrl: string, notes?: string) => {
@@ -263,32 +270,40 @@ export default function Dashboard() {
   };
 
   const handleReject = async (contractId: string) => {
+    setActionLoading(`reject-${contractId}`);
     try {
       const client = getDataClient();
       await client.updateContract(contractId, { status: 'REJECTED' });
       toast({ title: 'Contract rejected' });
       loadData();
     } catch (error) {
+      console.error('Error rejecting contract:', error);
       toast({
         title: 'Error',
-        description: 'Failed to reject contract',
+        description: 'Failed to reject contract. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleExtensionAction = async (extensionId: string, approved: boolean) => {
+    setActionLoading(`extension-${extensionId}`);
     try {
       const client = getDataClient();
       await client.approveExtension(extensionId, approved);
       toast({ title: approved ? 'Extension approved' : 'Extension rejected' });
       loadData();
     } catch (error) {
+      console.error('Error processing extension:', error);
       toast({
         title: 'Error',
-        description: 'Failed to process extension',
+        description: 'Failed to process extension. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -838,8 +853,13 @@ export default function Dashboard() {
                       e.stopPropagation();
                       handleAccept(contract);
                     }}
+                    disabled={actionLoading === `accept-${contract.id}`}
                   >
-                    Accept & Upload
+                    {actionLoading === `accept-${contract.id}` ? (
+                      <LoadingSpinner size="sm" text="" />
+                    ) : (
+                      'Accept & Upload'
+                    )}
                   </Button>
                   <Button 
                     size="sm" 
@@ -920,8 +940,13 @@ export default function Dashboard() {
                           e.stopPropagation();
                           handleExtensionAction(extension.id, true);
                         }}
+                        disabled={actionLoading === `extension-${extension.id}`}
                       >
-                        Approve
+                        {actionLoading === `extension-${extension.id}` ? (
+                          <LoadingSpinner size="sm" text="" />
+                        ) : (
+                          'Approve'
+                        )}
                       </Button>
                       <Button 
                         size="sm"
@@ -931,8 +956,13 @@ export default function Dashboard() {
                           e.stopPropagation();
                           handleExtensionAction(extension.id, false);
                         }}
+                        disabled={actionLoading === `extension-${extension.id}`}
                       >
-                        Reject
+                        {actionLoading === `extension-${extension.id}` ? (
+                          <LoadingSpinner size="sm" text="" />
+                        ) : (
+                          'Reject'
+                        )}
                       </Button>
                     </div>
                   </div>

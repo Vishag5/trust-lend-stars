@@ -59,7 +59,7 @@ export function MobileHeader({ title, showBack = false, rightElement }: MobileHe
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {rightElement && (
             <div className="flex-shrink-0">
               {rightElement}
