@@ -44,6 +44,17 @@ export default function Dashboard() {
   const showDebugPanel = useDebugPanel();
   const isDemo = useIsDemoMode();
   
+  // Debug logging
+  console.log('🔍 Dashboard Feature Flags:', {
+    showSecurityTests,
+    showUIUXTests,
+    showDebugPanel,
+    isDemo,
+    mode: import.meta.env.VITE_APP_MODE,
+    securityTests: import.meta.env.VITE_ENABLE_SECURITY_TESTS,
+    uiuxTests: import.meta.env.VITE_ENABLE_UIUX_TESTS
+  });
+  
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
@@ -505,6 +516,19 @@ export default function Dashboard() {
               </div>
             </div>
             
+            {/* Debug Info Panel */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <h3 className="text-lg font-semibold text-yellow-800 mb-2">🔍 Phase 2 Debug Info</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Mode: <span className="font-mono">{import.meta.env.VITE_APP_MODE}</span></div>
+                <div>Security Tests: <span className={showSecurityTests ? "text-green-600" : "text-red-600"}>{showSecurityTests ? "✅ ON" : "❌ OFF"}</span></div>
+                <div>UI/UX Tests: <span className={showUIUXTests ? "text-green-600" : "text-red-600"}>{showUIUXTests ? "✅ ON" : "❌ OFF"}</span></div>
+                <div>Debug Panel: <span className={showDebugPanel ? "text-green-600" : "text-red-600"}>{showDebugPanel ? "✅ ON" : "❌ OFF"}</span></div>
+                <div>Is Demo: <span className={isDemo ? "text-green-600" : "text-red-600"}>{isDemo ? "✅ YES" : "❌ NO"}</span></div>
+                <div>Security Env: <span className="font-mono">{import.meta.env.VITE_ENABLE_SECURITY_TESTS}</span></div>
+              </div>
+            </div>
+            
             {/* Security Test Panel - Only in demo mode */}
             {showSecurityTests && <SecurityTestPanel />}
             
@@ -940,8 +964,8 @@ export default function Dashboard() {
                       View Details
                     </Button>
                     <div className="flex gap-2 flex-1">
-                      <Button 
-                        size="sm"
+                    <Button 
+                      size="sm"
                         className="flex-1 min-w-0 text-xs bg-success hover:bg-success/90 touch-target"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -954,9 +978,9 @@ export default function Dashboard() {
                         ) : (
                           'Approve'
                         )}
-                      </Button>
-                      <Button 
-                        size="sm"
+                    </Button>
+                    <Button 
+                      size="sm"
                         variant="destructive" 
                         className="flex-1 min-w-0 text-xs touch-target"
                         onClick={(e) => {
@@ -970,7 +994,7 @@ export default function Dashboard() {
                         ) : (
                           'Reject'
                         )}
-                      </Button>
+                    </Button>
                     </div>
                   </div>
                 </Card>
@@ -1335,7 +1359,7 @@ export default function Dashboard() {
       {/* {import.meta.env.MODE === 'development' && (
         <SecurityTestRunner />
       )} */}
-      </div>
+    </div>
     </ErrorBoundary>
   );
 }
