@@ -21,6 +21,11 @@ import { format } from 'date-fns';
 import { InviteDialog } from '@/components/InviteDialog';
 import { ContractHistoryDialog } from '@/components/ContractHistoryDialog';
 import { ContractDetailsDialog } from '@/components/ContractDetailsDialog';
+import { ReminderManager } from '@/components/ReminderManager';
+import { NotificationBell } from '@/components/NotificationBell';
+import { InAppNotification } from '@/components/InAppNotification';
+import { reminderService } from '@/lib/reminderService';
+import { notificationService } from '@/lib/notificationService';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -42,6 +47,7 @@ export default function Dashboard() {
   const [proofType, setProofType] = useState<'disbursal' | 'settlement'>('disbursal');
   const [activeContract, setActiveContract] = useState<Contract | null>(null);
   const [activeExtension, setActiveExtension] = useState<Extension | null>(null);
+  const [showReminderManager, setShowReminderManager] = useState(false);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -49,7 +55,51 @@ export default function Dashboard() {
       return;
     }
     loadData();
+    
+    // Start reminder service
+    reminderService.start();
+    
+    // Request notification permission
+    requestNotificationPermission();
+    
+    return () => {
+      reminderService.stop();
+    };
   }, [currentUserId, navigate]);
+
+  const requestNotificationPermission = async () => {
+    try {
+      const permission = await notificationService.requestPermission();
+      if (permission === 'granted') {
+        console.log('✅ Notification permission granted');
+        toast({
+          title: 'Notifications Enabled',
+          description: 'You will receive payment reminders on your phone screen',
+        });
+      } else if (permission === 'denied') {
+        console.log('❌ Notification permission denied');
+        
+        // Check if it's iOS Chrome
+        if (notificationService.isIOS() && !notificationService.isIOSSafari()) {
+          toast({
+            title: 'iOS Chrome Limitation',
+            description: 'For notifications, please use Safari browser or add this app to your home screen',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Notifications Disabled',
+            description: 'You can enable notifications in your browser settings',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        console.log('⏳ Notification permission pending');
+      }
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+    }
+  };
 
   const loadData = async () => {
     if (!currentUserId) return;
@@ -392,10 +442,17 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-muted/30">
-      <MobileHeader />
+    <div className="flex h-screen-safe min-h-screen-safe flex-col bg-muted/30">
+      <MobileHeader 
+        rightElement={
+          <NotificationBell 
+            userId={currentUserId} 
+            onNotificationClick={() => setShowReminderManager(true)}
+          />
+        }
+      />
       
-      <main className="flex-1 space-y-4 px-4 sm:px-6 py-6 pb-safe">
+      <main className="flex-1 space-y-4 px-4 sm:px-6 py-6 pb-safe overflow-y-auto">
         {/* Development Tools */}
         {process.env.NODE_ENV === 'development' && (
           <div className="bg-muted/50 border border-dashed rounded-md p-3 mb-4">
@@ -584,7 +641,7 @@ export default function Dashboard() {
                   }}
                 >
                   <Eye className="mr-2 h-4 w-4" />
-                  View Your Uploaded Proof
+                  View Proof
                 </Button>
               </Card>
             ))}
@@ -762,18 +819,18 @@ export default function Dashboard() {
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
-                    className="flex-1 bg-success hover:bg-success/90" 
+                    className="flex-1 min-w-0 text-xs bg-success hover:bg-success/90" 
                     onClick={(e) => {
                       e.stopPropagation();
                       handleAccept(contract);
                     }}
                   >
-                    Accept & Upload Proof
+                    Accept & Upload
                   </Button>
                   <Button 
                     size="sm" 
                     variant="destructive" 
-                    className="flex-1" 
+                    className="flex-1 min-w-0 text-xs" 
                     onClick={(e) => {
                       e.stopPropagation();
                       handleReject(contract.id);
@@ -808,14 +865,14 @@ export default function Dashboard() {
                         <h3 className="font-semibold">{contract.borrower?.name}</h3>
                         <div className="text-xs text-muted-foreground">
                           Requesting {extension.extra_days} extra days
-                        </div>
+                      </div>
                         <div className="flex items-center gap-2 mt-1">
                           <ReliabilityStars score={contract.borrower?.trust_reliability_cached || 0} />
                           <span className="text-xs text-muted-foreground">
                             {contract.borrower?.trust_reliability_cached || 0}% reliability
                           </span>
-                        </div>
-                      </div>
+                    </div>
+                  </div>
                     </div>
                     <StatusBadge status={contract.status} />
                   </div>
@@ -832,18 +889,18 @@ export default function Dashboard() {
                     <Button 
                       size="sm"
                       variant="outline"
-                      className="flex-1"
+                      className="flex-1 min-w-0 text-xs"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleViewContractHistory(contract, extension);
                       }}
                     >
-                      <Eye className="h-4 w-4 mr-1" />
+                      <Eye className="h-3 w-3 mr-1" />
                       View Details
                     </Button>
                     <Button 
                       size="sm"
-                      className="flex-1 bg-success hover:bg-success/90"
+                      className="flex-1 min-w-0 text-xs bg-success hover:bg-success/90"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleExtensionAction(extension.id, true);
@@ -852,9 +909,9 @@ export default function Dashboard() {
                       Approve
                     </Button>
                     <Button 
-                      size="sm" 
+                      size="sm"
                       variant="destructive" 
-                      className="flex-1"
+                      className="w-full min-w-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleExtensionAction(extension.id, false);
@@ -893,8 +950,8 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <StatusBadge status={contract.status} />
-                </div>
-                
+        </div>
+
                 <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center gap-2">
                     <IndianRupee className="h-4 w-4 text-success" />
@@ -971,7 +1028,7 @@ export default function Dashboard() {
                       <div className="text-xs text-muted-foreground">Due Date</div>
                       <div className="font-semibold">{format(new Date(contract.due_at), 'MMM dd, yyyy')}</div>
                     </div>
-                    </div>
+                  </div>
                   </div>
                 
                 <div className="bg-blue-100 border border-blue-300 rounded-md p-3 mb-3">
@@ -991,7 +1048,7 @@ export default function Dashboard() {
                         }}
                       >
                   <Eye className="mr-2 h-4 w-4" />
-                  View Your Uploaded Proof
+                  View Proof
                       </Button>
               </Card>
             ))}
@@ -1067,7 +1124,7 @@ export default function Dashboard() {
                       <Button 
                         size="sm" 
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 min-w-0 text-xs"
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowProofDialog(true);
@@ -1078,26 +1135,26 @@ export default function Dashboard() {
                     ) : (
                       <Button 
                         size="sm" 
-                        className="flex-1 bg-success hover:bg-success/90"
+                        className="flex-1 min-w-0 text-xs bg-success hover:bg-success/90"
                         onClick={(e) => {
                           e.stopPropagation();
                             handleInitiateSettlement(contract);
                         }}
                       >
-                          Mark as Paid & Upload Proof
+                          Mark as Paid
                       </Button>
                     )}
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        className="flex-1"
+                        className="flex-1 min-w-0 text-xs"
                         onClick={(e) => {
                           e.stopPropagation();
                           setActiveContract(contract);
                           setShowExtensionDialog(true);
                         }}
                       >
-                        <Clock className="mr-2 h-4 w-4" />
+                        <Clock className="mr-1 h-3 w-3" />
                         Request Extension
                       </Button>
                     </>
@@ -1106,14 +1163,14 @@ export default function Dashboard() {
                   {contract.lender_id === currentUserId && contract.status === 'PENDING_SETTLEMENT' && contract.settlement_pending && (
                     <Button 
                       size="sm" 
-                      className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground"
+                      className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleViewProof(contract, 'settlement');
                       }}
                     >
                       <Eye className="mr-1 h-3 w-3" />
-                      Review Settlement Proof
+                      Review Settlement
                       </Button>
                     )}
                   </div>
@@ -1192,6 +1249,34 @@ export default function Dashboard() {
         showActions={true}
         userRole={activeContract?.borrower_id === currentUserId ? 'borrower' : activeContract?.lender_id === currentUserId ? 'lender' : 'viewer'}
       />
+
+      {/* Reminder Manager Dialog */}
+      {showReminderManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowReminderManager(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Reminder Manager</h2>
+              <button 
+                onClick={() => setShowReminderManager(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4">
+              <ReminderManager
+                userId={currentUserId}
+                onReminderAction={(action, reminderId) => {
+                  console.log(`Reminder action: ${action} for reminder: ${reminderId}`);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fallback In-App Notifications for iOS Chrome */}
+      <InAppNotification userId={currentUserId} />
     </div>
   );
 }

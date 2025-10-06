@@ -126,7 +126,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
             <Button 
               size="sm" 
               variant="outline" 
-              className="flex-1"
+              className="w-full min-w-0 touch-target"
               onClick={(e) => { e.stopPropagation(); }}
             >
               Awaiting Approval
@@ -136,7 +136,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
           buttons.push(
             <Button 
               size="sm" 
-              className="flex-1 bg-success hover:bg-success/90"
+              className="w-full bg-success hover:bg-success/90 touch-target"
               onClick={(e) => { e.stopPropagation(); setShowSettleDialog(true); }}
             >
               Mark as Paid
@@ -149,7 +149,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  className="flex-1"
+                  className="w-full min-w-0 touch-target"
                   onClick={(e) => { 
                     e.stopPropagation();
                     setShowExtensionDialog(true);
@@ -177,7 +177,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
         buttons.push(
             <Button 
               size="sm" 
-              className="flex-1 bg-success hover:bg-success/90"
+              className="w-full bg-success hover:bg-success/90 touch-target"
             onClick={(e) => { e.stopPropagation(); }}
             >
               <CheckCircle className="mr-2 h-4 w-4" />
@@ -188,7 +188,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
           <Button 
             size="sm" 
             variant="destructive" 
-            className="flex-1"
+            className="w-full min-w-0"
             onClick={(e) => { e.stopPropagation(); }}
           >
             <XCircle className="mr-2 h-4 w-4" />
@@ -201,7 +201,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
           buttons.push(
             <Button 
               size="sm" 
-            className="flex-1 bg-primary hover:bg-primary/90"
+            className="w-full bg-primary hover:bg-primary/90 touch-target"
             onClick={(e) => { e.stopPropagation(); }}
             >
             Review Settlement
@@ -218,7 +218,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
               key="reviewed"
               size="sm"
               variant="outline"
-              className="flex-1"
+              className="w-full min-w-0 touch-target"
               disabled
             >
               ✓ Reviewed
@@ -230,7 +230,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
               key="review"
               size="sm"
               variant="outline"
-              className="flex-1"
+              className="w-full min-w-0 touch-target"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowReviewDialog(true);
@@ -257,7 +257,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
   return (
     <>
       <Card 
-        className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+        className="p-4 cursor-pointer hover:shadow-md transition-shadow touch-target card-mobile"
         onClick={() => setShowContractDetailsDialog(true)}
       >
         <div className="mb-3 flex items-start justify-between">
@@ -271,48 +271,45 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold truncate">
+              <h3 className="font-semibold text-sm leading-tight">
                 {contract.borrower_id === currentUserId 
                   ? contract.lender?.name 
                   : contract.borrower?.name
                 }
               </h3>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-muted-foreground mt-0.5">
                 {contract.borrower_id === currentUserId ? 'You owe' : 'They owe you'}
               </div>
               {/* Show trust score for borrowers */}
               {contract.borrower_id !== currentUserId && contract.borrower?.trust_reliability_cached !== null && (
                 <div className="flex items-center gap-1 mt-1">
-                  <ReliabilityStars score={contract.borrower?.trust_reliability_cached || 0} />
+                  <ReliabilityStars score={contract.borrower?.trust_reliability_cached || 0} size="sm" />
                 </div>
               )}
             </div>
           </div>
           <div className="flex items-center flex-shrink-0 ml-2">
-            <StatusBadge status={contract.status} />
-          </div>
+          <StatusBadge status={contract.status} />
+        </div>
         </div>
         
-        <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center gap-2">
+        <div className="mb-3 grid grid-cols-2 gap-3 text-sm">
+          <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Amount</span>
-            <div className="font-semibold">₹{contract.amount}</div>
+            <div className="font-semibold text-base">₹{contract.amount.toLocaleString('en-IN')}</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Due</span>
-            <div className="font-semibold">{formatDateTime(contract.due_at)}</div>
+            <div className="font-semibold text-sm leading-tight">{formatDateTime(contract.due_at)}</div>
           </div>
         </div>
         
         <div className="space-y-1 text-sm">
-          <p className="text-muted-foreground">
-            Due: {formatDateTime(contract.due_at)}
-          </p>
           {contract.reason && (
-            <p className="text-muted-foreground">Reason: {contract.reason}</p>
+            <p className="text-muted-foreground text-xs">Reason: {contract.reason}</p>
           )}
           {contract.attachment_url && (
-            <p className="text-muted-foreground">📎 Document attached</p>
+            <p className="text-muted-foreground text-xs">📎 Document attached</p>
           )}
         </div>
 

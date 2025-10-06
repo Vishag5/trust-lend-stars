@@ -1,4 +1,6 @@
 import { User, Contract, Extension, Review, Reminder } from './types';
+import { reminderSystem } from './reminderSystem';
+import { notificationService } from './notificationService';
 
 export type ContractStatus = 'REQUESTED' | 'PENDING_DISBURSAL' | 'ACTIVE' | 'DUE' | 'PENDING_SETTLEMENT' | 'SETTLED' | 'REJECTED';
 
@@ -317,6 +319,18 @@ class MockDataClient implements DataClient {
     };
     contracts.push(contract);
     this.setStore('contracts', contracts);
+    
+    // Schedule payment reminders for the new contract
+    try {
+      reminderSystem.schedulePaymentReminders(contract);
+      console.log('Payment reminders scheduled for contract:', contract.id);
+    } catch (error) {
+      console.error('Failed to schedule reminders:', error);
+    }
+    
+    // Show loan request notification to lender
+    await this.showLoanRequestNotification(contract);
+    
     console.log('Contract created:', contract);
     return contract;
   }
@@ -333,13 +347,77 @@ class MockDataClient implements DataClient {
     this.setStore('contracts', contracts);
     console.log('Contract updated:', contracts[index]);
     
+    // Handle reminder scheduling based on status changes
+    try {
+      if (data.status === 'ACTIVE' && oldStatus === 'REQUESTED') {
+        // Contract was accepted, schedule payment reminders
+        reminderSystem.schedulePaymentReminders(contracts[index]);
+        console.log('Payment reminders scheduled for active contract:', contracts[index].id);
+      } else if (data.status === 'DUE' && oldStatus === 'ACTIVE') {
+        // Contract is now overdue, schedule overdue reminders
+        reminderSystem.scheduleOverdueReminders(contracts[index]);
+        console.log('Overdue reminders scheduled for contract:', contracts[index].id);
+      } else if (data.status === 'SETTLED' && oldStatus !== 'SETTLED') {
+        // Contract settled, cancel all reminders
+        reminderSystem.cancelContractReminders(contracts[index].id);
+        console.log('All reminders cancelled for settled contract:', contracts[index].id);
+      } else if (data.status === 'REJECTED' && oldStatus !== 'REJECTED') {
+        // Contract rejected, cancel all reminders
+        reminderSystem.cancelContractReminders(contracts[index].id);
+        console.log('All reminders cancelled for rejected contract:', contracts[index].id);
+      }
+    } catch (error) {
+      console.error('Failed to handle reminder scheduling:', error);
+    }
+    
     // Update borrower's reliability when contract is settled
     if (data.status === 'SETTLED' && oldStatus !== 'SETTLED') {
       console.log('Contract settled, updating borrower reliability');
       await this.updateBorrowerReliability(contracts[index].borrower_id);
     }
     
+    // Show browser notifications for important status changes
+    await this.showStatusChangeNotification(contracts[index], oldStatus, data.status);
+    
     return contracts[index];
+  }
+
+  private async showLoanRequestNotification(contract: Contract) {
+    try {
+      const borrower = this.getUserById(contract.borrower_id);
+      if (borrower) {
+        await notificationService.showLoanRequest(
+          contract.id,
+          borrower.name,
+          contract.amount
+        );
+      }
+    } catch (error) {
+      console.error('Error showing loan request notification:', error);
+    }
+  }
+
+  private async showStatusChangeNotification(contract: Contract, oldStatus: string, newStatus: string) {
+    try {
+      // Only show notifications for significant status changes
+      if (oldStatus === newStatus) return;
+
+      const borrower = this.getUserById(contract.borrower_id);
+      const lender = this.getUserById(contract.lender_id);
+      
+      // Show notification to both parties for important changes
+      const importantStatuses = ['ACTIVE', 'DUE', 'SETTLED', 'REJECTED', 'PENDING_DISBURSAL', 'PENDING_SETTLEMENT'];
+      
+      if (importantStatuses.includes(newStatus)) {
+        await notificationService.showContractStatusChange(
+          contract.id,
+          newStatus,
+          contract.amount
+        );
+      }
+    } catch (error) {
+      console.error('Error showing status change notification:', error);
+    }
   }
 
   async getExtensionsForContract(contractId: string): Promise<Extension[]> {
@@ -385,6 +463,26 @@ class MockDataClient implements DataClient {
       decided_at: new Date().toISOString() 
     };
     this.setStore('extensions', extensions);
+    
+    // If extension is approved, reschedule reminders with new due date
+    if (approved) {
+      try {
+        const contracts = this.getStore<Contract>('contracts');
+        const contract = contracts.find(c => c.id === extensions[index].contract_id);
+        if (contract) {
+          // Update contract with new due date
+          const updatedContract = { ...contract, due_at: extensions[index].new_due_at };
+          await this.updateContract(contract.id, { due_at: extensions[index].new_due_at });
+          
+          // Reschedule reminders with new due date
+          reminderSystem.rescheduleAfterExtension(updatedContract);
+          console.log('Reminders rescheduled for extension approval:', contract.id);
+        }
+      } catch (error) {
+        console.error('Failed to reschedule reminders after extension approval:', error);
+      }
+    }
+    
     console.log('Extension approved:', extensions[index]);
     return extensions[index];
   }

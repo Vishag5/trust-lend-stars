@@ -10,10 +10,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 interface MobileHeaderProps {
   title?: string;
   showBack?: boolean;
-  rightElement?: React.ReactNode;
 }
 
-export function MobileHeader({ title, showBack = false, rightElement }: MobileHeaderProps) {
+export function MobileHeader({ title, showBack = false }: MobileHeaderProps) {
   const { currentUser, logout } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -40,7 +39,7 @@ export function MobileHeader({ title, showBack = false, rightElement }: MobileHe
   const isDashboard = location.pathname === '/dashboard';
 
   return (
-    <header className="sticky top-0 z-40 bg-primary pt-safe">
+    <header className="sticky top-0 z-40 bg-primary">
       <div className="flex items-center justify-between px-4 py-4">
         <div className="flex items-center gap-3">
           {showBack ? (
@@ -60,24 +59,20 @@ export function MobileHeader({ title, showBack = false, rightElement }: MobileHe
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {rightElement && (
-            <div className="flex-shrink-0">
-              {rightElement}
-            </div>
-          )}
           {isDashboard && (
             <Button 
               size="sm" 
-              className="bg-success hover:bg-success/90 text-white text-xs px-2 py-1"
+              className="bg-success hover:bg-success/90 text-white"
               onClick={handleInvite}
             >
-              <Share2 className="h-3 w-3" />
+              <Share2 className="mr-2 h-4 w-4" />
+              Invite Friends
             </Button>
           )}
           <Button 
             size="sm" 
             variant="ghost" 
-            className="text-white hover:bg-white/10 p-1"
+            className="text-white hover:bg-white/10"
             onClick={handleLogout}
             title="Logout"
           >
