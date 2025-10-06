@@ -26,6 +26,7 @@ import { ReminderManager } from '@/components/ReminderManager';
 import { NotificationBell } from '@/components/NotificationBell';
 import { InAppNotification } from '@/components/InAppNotification';
 import { SecurityTestPanel } from '@/components/SecurityTestPanel';
+import { UIUXTestSuite } from '@/components/UIUXTestSuite';
 import { reminderService } from '@/lib/reminderService';
 import { notificationService } from '@/lib/notificationService';
 
@@ -481,6 +482,9 @@ export default function Dashboard() {
             
             {/* Security Test Panel */}
             <SecurityTestPanel />
+            
+            {/* UI/UX Test Suite */}
+            <UIUXTestSuite />
           </div>
         )}
 
@@ -892,11 +896,11 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button 
                       size="sm"
                       variant="outline"
-                      className="flex-1 min-w-0 text-xs"
+                      className="flex-1 min-w-0 text-xs touch-target"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleViewContractHistory(contract, extension);
@@ -905,27 +909,29 @@ export default function Dashboard() {
                       <Eye className="h-3 w-3 mr-1" />
                       View Details
                     </Button>
-                    <Button 
-                      size="sm"
-                      className="flex-1 min-w-0 text-xs bg-success hover:bg-success/90"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleExtensionAction(extension.id, true);
-                      }}
-                    >
-                      Approve
-                    </Button>
-                    <Button 
-                      size="sm"
-                      variant="destructive" 
-                      className="w-full min-w-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleExtensionAction(extension.id, false);
-                      }}
-                    >
-                      Reject
-                    </Button>
+                    <div className="flex gap-2 flex-1">
+                      <Button 
+                        size="sm"
+                        className="flex-1 min-w-0 text-xs bg-success hover:bg-success/90 touch-target"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExtensionAction(extension.id, true);
+                        }}
+                      >
+                        Approve
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="destructive" 
+                        className="flex-1 min-w-0 text-xs touch-target"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExtensionAction(extension.id, false);
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               );

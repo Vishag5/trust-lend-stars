@@ -386,3 +386,76 @@ All colors MUST be HSL.
     transform: scale(0.98);
   }
 }
+
+/* Responsive design for larger screens */
+@media (min-width: 640px) {
+  .card-mobile {
+    max-width: 100%;
+  }
+  
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
+
+@media (min-width: 768px) {
+  .card-mobile {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .touch-target {
+    min-height: 52px;
+    min-width: 52px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .card-mobile {
+    max-width: 700px;
+  }
+  
+  .touch-target {
+    min-height: 56px;
+    min-width: 56px;
+  }
+}
+
+/* Button layout improvements for larger screens */
+@media (min-width: 640px) {
+  .button-group {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  
+  .button-group .touch-target {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* Card spacing improvements */
+@media (min-width: 768px) {
+  .card-spacing {
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+}
+
+/* Text sizing for different screen sizes */
+@media (min-width: 640px) {
+  .text-responsive {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .text-responsive {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+}
