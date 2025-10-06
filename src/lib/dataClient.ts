@@ -1,6 +1,7 @@
 import { User, Contract, Extension, Review, Reminder } from './types';
 import { reminderSystem } from './reminderSystem';
 import { notificationService } from './notificationService';
+import { rateLimit, RATE_LIMITS } from './rateLimiter';
 
 export type ContractStatus = 'REQUESTED' | 'PENDING_DISBURSAL' | 'ACTIVE' | 'DUE' | 'PENDING_SETTLEMENT' | 'SETTLED' | 'REJECTED';
 
@@ -306,6 +307,12 @@ class MockDataClient implements DataClient {
     reason: string | null;
     attachment_url?: string | null;
   }): Promise<Contract> {
+    // Rate limiting for contract creation
+    const rateLimitKey = `contract_create_${data.borrower_id}`;
+    if (!rateLimit(rateLimitKey, RATE_LIMITS.CONTRACT_CREATE)) {
+      throw new Error('Rate limit exceeded: Too many contract creation attempts');
+    }
+    
     console.log('createContract called with data:', data);
     this.ensureDemoData();
     const contracts = this.getStore<Contract>('contracts');
