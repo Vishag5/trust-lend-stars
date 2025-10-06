@@ -1,9 +1,9 @@
 // Environment security configuration
 export const ENV_CONFIG = {
-  NODE_ENV: process.env.NODE_ENV || "development",
-  APP_MODE: process.env.VITE_APP_MODE || "demo",
-  SUPABASE_URL: process.env.VITE_SUPABASE_URL,
-  SUPABASE_KEY: process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  NODE_ENV: import.meta.env.MODE || "development",
+  APP_MODE: import.meta.env.VITE_APP_MODE || "demo",
+  SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+  SUPABASE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
 };
 
 // Validate required environment variables

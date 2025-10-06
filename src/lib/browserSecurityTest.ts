@@ -132,7 +132,7 @@ export class BrowserSecurityTestRunner {
     try {
       // Test environment variables
       const envVars = {
-        NODE_ENV: process.env.NODE_ENV || 'development',
+        NODE_ENV: import.meta.env.MODE || 'development',
         VITE_APP_MODE: import.meta.env.VITE_APP_MODE || 'demo',
         VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
         VITE_SUPABASE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,

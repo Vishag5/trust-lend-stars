@@ -456,7 +456,7 @@ export default function Dashboard() {
       
       <main className="flex-1 space-y-4 px-4 sm:px-6 py-6 pb-safe overflow-y-auto">
         {/* Development Tools */}
-        {process.env.NODE_ENV === 'development' && (
+        {import.meta.env.MODE === 'development' && (
           <div className="space-y-4 mb-4">
             <div className="bg-muted/50 border border-dashed rounded-md p-3">
               <div className="flex items-center justify-between">
@@ -1286,7 +1286,7 @@ export default function Dashboard() {
       <InAppNotification userId={currentUserId} />
       
       {/* Security Test Runner - Only show in demo mode */}
-      {/* {process.env.NODE_ENV === 'development' && (
+      {/* {import.meta.env.MODE === 'development' && (
         <SecurityTestRunner />
       )} */}
     </div>

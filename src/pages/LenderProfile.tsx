@@ -176,7 +176,7 @@ export default function LenderProfile() {
       
       <main className="flex-1 px-4 py-6">
         {/* Debug info in development */}
-        {process.env.NODE_ENV === 'development' && (
+        {import.meta.env.MODE === 'development' && (
           <Card className="p-3 mb-4 bg-yellow-50 border-yellow-200">
             <p className="text-xs text-yellow-800">
               <strong>Debug:</strong> {debugInfo}
