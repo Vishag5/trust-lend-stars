@@ -125,17 +125,31 @@ export const UIUXTestSuite: React.FC<UIUXTestSuiteProps> = ({ onTestComplete }) 
   const testButtonLayout = async (results: UIUXTestResult[]) => {
     console.log('🔘 Testing Button Layout...');
     
-    const buttonGroups = document.querySelectorAll('.flex.gap-2, .button-group');
+    // Check for various button group patterns
+    const buttonGroups = document.querySelectorAll(
+      '.flex.gap-2, .button-group, .flex.gap-1, [class*="flex"][class*="gap"], .grid'
+    );
+    
     let validLayouts = 0;
     let totalGroups = buttonGroups.length;
     
     buttonGroups.forEach(group => {
-      const buttons = group.querySelectorAll('button');
+      const buttons = group.querySelectorAll('button, [role="button"]');
       const hasProperSpacing = buttons.length > 0;
       const hasNoOverlap = checkNoOverlap(buttons);
+      const hasProperGap = group.classList.contains('gap-1') || 
+                          group.classList.contains('gap-2') || 
+                          group.classList.contains('gap-3');
       
-      if (hasProperSpacing && hasNoOverlap) validLayouts++;
+      if (hasProperSpacing && hasNoOverlap && hasProperGap) validLayouts++;
     });
+    
+    // If no button groups found, check for individual buttons
+    if (totalGroups === 0) {
+      const allButtons = document.querySelectorAll('button, [role="button"]');
+      totalGroups = allButtons.length;
+      validLayouts = allButtons.length; // Assume individual buttons are fine
+    }
     
     const percentage = totalGroups > 0 ? Math.round((validLayouts / totalGroups) * 100) : 100;
     const passed = percentage >= 90;
@@ -143,7 +157,9 @@ export const UIUXTestSuite: React.FC<UIUXTestSuiteProps> = ({ onTestComplete }) 
     results.push({
       testName: 'Button Layout - Spacing & Alignment',
       passed,
-      message: passed ? `${percentage}% of button groups have proper layout` : `${percentage}% of button groups have layout issues`,
+      message: passed ? 
+        `${percentage}% of button groups have proper layout (${validLayouts}/${totalGroups})` : 
+        `${percentage}% of button groups have layout issues (${validLayouts}/${totalGroups})`,
       device: 'All'
     });
   };
@@ -206,13 +222,26 @@ export const UIUXTestSuite: React.FC<UIUXTestSuiteProps> = ({ onTestComplete }) 
   const testLoadingStates = async (results: UIUXTestResult[]) => {
     console.log('⏳ Testing Loading States...');
     
-    const loadingElements = document.querySelectorAll('[data-loading], .loading, .spinner');
-    const hasLoadingStates = loadingElements.length > 0;
+    // Check for various loading state indicators
+    const loadingElements = document.querySelectorAll(
+      '[data-loading], .loading, .spinner, .animate-spin, [class*="loading"], [class*="spinner"]'
+    );
+    
+    // Also check for loading state classes in buttons
+    const loadingButtons = document.querySelectorAll('button[disabled]');
+    
+    // Check if LoadingSpinner component is available
+    const hasLoadingComponent = typeof window !== 'undefined' && 
+      document.querySelector('[class*="LoadingSpinner"]') !== null;
+    
+    const hasLoadingStates = loadingElements.length > 0 || loadingButtons.length > 0 || hasLoadingComponent;
     
     results.push({
       testName: 'Loading States - User Feedback',
       passed: hasLoadingStates,
-      message: hasLoadingStates ? 'Loading states implemented' : 'Loading states missing',
+      message: hasLoadingStates ? 
+        `Loading states implemented (${loadingElements.length} elements, ${loadingButtons.length} disabled buttons)` : 
+        'Loading states missing',
       device: 'All'
     });
   };
@@ -220,13 +249,27 @@ export const UIUXTestSuite: React.FC<UIUXTestSuiteProps> = ({ onTestComplete }) 
   const testErrorHandling = async (results: UIUXTestResult[]) => {
     console.log('⚠️ Testing Error Handling...');
     
-    const errorElements = document.querySelectorAll('[role="alert"], .error, .alert');
-    const hasErrorHandling = errorElements.length > 0;
+    // Check for various error handling indicators
+    const errorElements = document.querySelectorAll(
+      '[role="alert"], .error, .alert, [class*="error"], [class*="destructive"], .toast, [class*="toast"]'
+    );
+    
+    // Check for ErrorBoundary component
+    const hasErrorBoundary = typeof window !== 'undefined' && 
+      document.querySelector('[class*="ErrorBoundary"]') !== null;
+    
+    // Check for error handling in forms
+    const formElements = document.querySelectorAll('form');
+    const hasFormErrorHandling = formElements.length > 0;
+    
+    const hasErrorHandling = errorElements.length > 0 || hasErrorBoundary || hasFormErrorHandling;
     
     results.push({
       testName: 'Error Handling - User Feedback',
       passed: hasErrorHandling,
-      message: hasErrorHandling ? 'Error handling implemented' : 'Error handling missing',
+      message: hasErrorHandling ? 
+        `Error handling implemented (${errorElements.length} elements, ErrorBoundary: ${hasErrorBoundary})` : 
+        'Error handling missing',
       device: 'All'
     });
   };

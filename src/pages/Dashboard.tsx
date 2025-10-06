@@ -382,7 +382,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen min-h-[100dvh] flex-col bg-background">
+      <div className="flex min-h-screen min-h-[100dvh] flex-col bg-background" data-loading="true">
         <MobileHeader />
         <main className="flex flex-1 items-center justify-center">
           <LoadingSpinner size="lg" text="Loading your dashboard..." />
@@ -463,7 +463,7 @@ export default function Dashboard() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen-safe min-h-screen-safe flex-col bg-muted/30">
+      <div className="flex h-screen-safe min-h-screen-safe flex-col bg-muted/30" data-error-handling="true">
       <MobileHeader 
         rightElement={
           <NotificationBell 
