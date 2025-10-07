@@ -4,6 +4,7 @@ export const DEMO_USERS = {
   BORROWER_A: { phone: '+919000011111', name: 'Borrower A' },
   BORROWER_B: { phone: '+919000033333', name: 'Borrower B' },
   LENDER_L1: { phone: '+919000022222', name: 'Lender L1' },
+  ADMIN: { phone: '+917012938275', name: 'Admin User', email: 'info.vishag@gmail.com' },
 };
 
 export async function seedDemoData(): Promise<void> {
@@ -30,7 +31,8 @@ export async function seedDemoData(): Promise<void> {
   const borrowerA = await client.createUser(DEMO_USERS.BORROWER_A);
   const borrowerB = await client.createUser(DEMO_USERS.BORROWER_B);
   const lenderL1 = await client.createUser(DEMO_USERS.LENDER_L1);
-  console.log('seedData: Users ready:', { borrowerA: borrowerA.id, borrowerB: borrowerB.id, lenderL1: lenderL1.id });
+  const adminUser = await client.createUser(DEMO_USERS.ADMIN);
+  console.log('seedData: Users ready:', { borrowerA: borrowerA.id, borrowerB: borrowerB.id, lenderL1: lenderL1.id, adminUser: adminUser.id });
 
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;

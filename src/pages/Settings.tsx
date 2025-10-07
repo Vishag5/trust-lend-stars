@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient, User } from '@/lib/dataClient';
 import { MobileHeader } from '@/components/MobileHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +17,8 @@ import { useToast } from '@/hooks/use-toast';
 export default function Settings() {
   const navigate = useNavigate();
   const { currentUserId, currentUser, logout } = useAuthStore();
+  const { currentUserId: prodCurrentUserId, currentUser: prodCurrentUser, logout: prodLogout } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,21 +27,27 @@ export default function Settings() {
     sms: true,
     push: false,
   });
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
+  const currentAuthUser = isDemoMode ? currentUser : prodCurrentUser;
+  const currentLogout = isDemoMode ? logout : prodLogout;
 
   useEffect(() => {
-    if (!currentUserId) {
+    if (!currentAuthUserId) {
       navigate('/');
       return;
     }
     loadUser();
-  }, [currentUserId, navigate]);
+  }, [currentAuthUserId, navigate]);
 
   const loadUser = async () => {
-    if (!currentUserId) return;
+    if (!currentAuthUserId) return;
     setLoading(true);
     try {
       const client = getDataClient();
-      const userData = await client.getUserById(currentUserId);
+      const userData = await client.getUserById(currentAuthUserId);
       setUser(userData);
     } catch (error) {
       toast({
@@ -50,8 +60,8 @@ export default function Settings() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await currentLogout();
     navigate('/');
     toast({
       title: 'Logged out',

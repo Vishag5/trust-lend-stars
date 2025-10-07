@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
-import { getDataClient, Contract, Extension } from '@/lib/dataClient';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { getDataClient, Contract } from '@/lib/dataClient';
+import { Extension } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { MobileHeader } from '@/components/MobileHeader';
 import { ExtensionRequestDialog } from '@/components/ExtensionRequestDialog';
@@ -13,7 +15,7 @@ import { PaymentProofDialog } from '@/components/PaymentProofDialog';
 import { ValidateProofDialog } from '@/components/ValidateProofDialog';
 import { ReviewDialog } from '@/components/ReviewDialog';
 // import { SecurityTestRunner } from '@/components/SecurityTestRunner';
-import { Plus, Search, FileText, Clock, User, Calendar, IndianRupee, Share2, BarChart3, Settings, HelpCircle, UserCircle, Eye } from 'lucide-react';
+import { Plus, Search, FileText, Clock, User, Calendar, IndianRupee, Share2, BarChart3, Settings, HelpCircle, UserCircle, Eye, Shield } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ReliabilityStars } from '@/components/ReliabilityStars';
 import { computeReliability } from '@/lib/reliability';
@@ -28,39 +30,34 @@ import { InAppNotification } from '@/components/InAppNotification';
 import { SecurityTestPanel } from '@/components/SecurityTestPanel';
 import { UIUXTestSuite } from '@/components/UIUXTestSuite';
 import { LoadingSpinner, LoadingOverlay } from '@/components/LoadingSpinner';
-import { useSecurityTests, useUIUXTests, useDebugPanel, useIsDemoMode } from '@/hooks/useFeatureFlag';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { ErrorBoundary, ErrorMessage } from '@/components/ErrorBoundary';
 import { reminderService } from '@/lib/reminderService';
 import { notificationService } from '@/lib/notificationService';
+import { AdminModeToggle } from '@/components/AdminModeToggle';
+import { useModeManager } from '@/hooks/useModeManager';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { currentUserId } = useAuthStore();
+  const { currentUserId, isAdmin, setCurrentUser } = useAuthStore();
+  const { currentUserId: prodCurrentUserId, isAdmin: prodIsAdmin, setCurrentUser: prodSetCurrentUser } = useProductionAuthStore();
   const { toast } = useToast();
   
-  // Feature flags - HARDCODED FOR PHASE 2 DEMO
-  const showSecurityTests = true; // Hardcoded for demo
-  const showUIUXTests = true; // Hardcoded for demo
-  const showDebugPanel = true; // Hardcoded for demo
-  const isDemo = true; // Hardcoded for demo
+  // Mode management
+  const { currentMode, changeMode, canChangeMode } = useModeManager();
   
-  // Debug logging
-  console.log('🔍 Dashboard Feature Flags:', {
-    showSecurityTests,
-    showUIUXTests,
-    showDebugPanel,
-    isDemo,
-    mode: import.meta.env.VITE_APP_MODE,
-    securityTests: import.meta.env.VITE_ENABLE_SECURITY_TESTS,
-    uiuxTests: import.meta.env.VITE_ENABLE_UIUX_TESTS
-  });
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
+  const currentIsAdmin = isDemoMode ? isAdmin : prodIsAdmin;
+  const currentSetCurrentUser = isDemoMode ? setCurrentUser : prodSetCurrentUser;
   
-  console.log('🔍 Environment Variables:', {
-    VITE_APP_MODE: import.meta.env.VITE_APP_MODE,
-    VITE_ENABLE_SECURITY_TESTS: import.meta.env.VITE_ENABLE_SECURITY_TESTS,
-    VITE_ENABLE_UIUX_TESTS: import.meta.env.VITE_ENABLE_UIUX_TESTS,
-    VITE_ENABLE_DEBUG_PANEL: import.meta.env.VITE_ENABLE_DEBUG_PANEL
-  });
+  // Feature flags - PRODUCTION MODE
+  const showSecurityTests = useFeatureFlag('securityTests') || currentMode === 'demo';
+  const showUIUXTests = useFeatureFlag('uiuxTests') || currentMode === 'demo';
+  const showDebugPanel = useFeatureFlag('debugPanel') || currentMode === 'demo';
+  const isDemo = useFeatureFlag('guestAccess') || currentMode === 'demo';
+  
   
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [extensions, setExtensions] = useState<Extension[]>([]);
@@ -80,35 +77,15 @@ export default function Dashboard() {
   const [showReminderManager, setShowReminderManager] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!currentUserId) {
-      navigate('/');
-      return;
-    }
-    loadData();
-    
-    // Start reminder service
-    reminderService.start();
-    
-    // Request notification permission
-    requestNotificationPermission();
-    
-    return () => {
-      reminderService.stop();
-    };
-  }, [currentUserId, navigate]);
-
-  const requestNotificationPermission = async () => {
+  const requestNotificationPermission = useCallback(async () => {
     try {
       const permission = await notificationService.requestPermission();
       if (permission === 'granted') {
-        console.log('✅ Notification permission granted');
         toast({
           title: 'Notifications Enabled',
           description: 'You will receive payment reminders on your phone screen',
         });
       } else if (permission === 'denied') {
-        console.log('❌ Notification permission denied');
         
         // Check if it's iOS Chrome
         if (notificationService.isIOS() && !notificationService.isIOSSafari()) {
@@ -125,23 +102,22 @@ export default function Dashboard() {
           });
         }
       } else {
-        console.log('⏳ Notification permission pending');
       }
     } catch (error) {
       console.error('Error requesting notification permission:', error);
     }
-  };
+  }, [toast]);
 
-  const loadData = async () => {
-    if (!currentUserId) return;
+  const loadData = useCallback(async () => {
+    if (!currentAuthUserId) return;
     setLoading(true);
     try {
       const client = getDataClient();
-      const contractsData = await client.getContractsForUser(currentUserId);
+      const contractsData = await client.getContractsForUser(currentAuthUserId);
       setContracts(contractsData);
       
       // Load extensions for all contracts
-      const allExtensions: Extension[] = [];
+      const allExtensions = [];
       for (const contract of contractsData) {
         const contractExtensions = await client.getExtensionsForContract(contract.id);
         allExtensions.push(...contractExtensions);
@@ -157,7 +133,25 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentAuthUserId, toast]);
+
+  useEffect(() => {
+    if (!currentAuthUserId) {
+      navigate('/');
+      return;
+    }
+    loadData();
+    
+    // Start reminder service
+    reminderService.start();
+    
+    // Request notification permission
+    requestNotificationPermission();
+    
+    return () => {
+      reminderService.stop();
+    };
+  }, [currentAuthUserId, loadData, requestNotificationPermission, navigate]);
 
   const handleAccept = async (contract: Contract) => {
     setActionLoading(`accept-${contract.id}`);
@@ -189,11 +183,7 @@ export default function Dashboard() {
         });
       } else {
         // Borrower uploading settlement proof
-        await client.updateContract(activeContract.id, { 
-          status: 'PENDING_SETTLEMENT',
-          repayment_proof_url: proofUrl,
-          settlement_pending: true,
-        });
+        await client.settleContract(activeContract.id, proofUrl);
         toast({ 
           title: 'Settlement proof uploaded!',
           description: 'Waiting for lender to confirm receipt',
@@ -242,10 +232,7 @@ export default function Dashboard() {
       } else {
         // Lender validating borrower's settlement proof
         if (approved) {
-          await client.updateContract(activeContract.id, { 
-            status: 'SETTLED',
-            settlement_pending: false,
-          });
+          await client.approveSettlement(activeContract.id);
           
           // Keep the contract active for review dialog
           const contractForReview = activeContract;
@@ -269,11 +256,7 @@ export default function Dashboard() {
           
           return; // Don't set activeContract to null yet
         } else {
-          await client.updateContract(activeContract.id, { 
-            status: 'DUE',
-            repayment_proof_url: null,
-            settlement_pending: false,
-          });
+          await client.rejectSettlement(activeContract.id);
           toast({ 
             title: 'Settlement proof rejected',
             description: 'Please contact the borrower',
@@ -317,7 +300,11 @@ export default function Dashboard() {
     setActionLoading(`extension-${extensionId}`);
     try {
       const client = getDataClient();
-      await client.approveExtension(extensionId, approved);
+      if (approved) {
+        await client.approveExtension(extensionId);
+      } else {
+        await client.rejectExtension(extensionId);
+      }
       toast({ title: approved ? 'Extension approved' : 'Extension rejected' });
       loadData();
     } catch (error) {
@@ -341,7 +328,6 @@ export default function Dashboard() {
         contract_id: activeContract.id,
         new_due_at: newDueDate.toISOString(),
         reason,
-        extra_days: extraDays,
       });
       setShowExtensionDialog(false);
       setActiveContract(null);
@@ -371,11 +357,10 @@ export default function Dashboard() {
     try {
       const client = getDataClient();
       await client.createReview({
-        contract_id: activeContract.id,
-        reviewer_id: currentUserId,
-        reviewee_id: activeContract.borrower_id,
-        stars: rating,
-        text: review || null,
+        reviewer_id: currentAuthUserId,
+        reviewed_user_id: activeContract.borrower_id,
+        rating: rating,
+        comment: review || '',
       });
       
       setShowReviewDialog(false);
@@ -405,6 +390,64 @@ export default function Dashboard() {
     setShowContractDetailsDialog(true);
   };
 
+  const handleUserSelect = async (phone: string, name: string) => {
+    try {
+      const client = getDataClient();
+      const user = await client.getUserByPhone(phone);
+      
+      if (user) {
+        currentSetCurrentUser(user);
+        toast({
+          title: `Switched to ${name}!`,
+          description: `Now viewing as ${phone}`,
+        });
+        // Reload data for the new user
+        loadData();
+      } else {
+        toast({
+          title: 'Error',
+          description: 'User not found',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: `Failed to switch user: ${error.message || 'Unknown error'}`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSwitchBackToAdmin = async () => {
+    try {
+      const client = getDataClient();
+      const adminUser = await client.getUserByPhone('+917012938275');
+      
+      if (adminUser) {
+        currentSetCurrentUser(adminUser);
+        toast({
+          title: 'Switched back to Admin!',
+          description: 'Now viewing as Admin User',
+        });
+        // Reload data for the admin user
+        loadData();
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Admin user not found',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: `Failed to switch back to admin: ${error.message || 'Unknown error'}`,
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen min-h-[100dvh] flex-col bg-background" data-loading="true">
@@ -417,49 +460,49 @@ export default function Dashboard() {
   }
 
   const requestsAsLender = contracts.filter(
-    (c) => c.lender_id === currentUserId && c.status === 'REQUESTED'
+    (c) => c.lender_id === currentAuthUserId && c.status === 'REQUESTED'
   );
   
   const requestsAsBorrower = contracts.filter(
-    (c) => c.borrower_id === currentUserId && c.status === 'REQUESTED'
+    (c) => c.borrower_id === currentAuthUserId && c.status === 'REQUESTED'
   );
   
   const pendingExtensions = extensions.filter(e => {
     const contract = contracts.find(c => c.id === e.contract_id);
-    return contract && contract.lender_id === currentUserId && e.approved === null;
+    return contract && contract.lender_id === currentAuthUserId && e.approved === null;
   });
   
   // Pending disbursal - Borrower needs to validate lender's payment proof
   const pendingDisbursalAsBorrower = contracts.filter(
-    c => c.status === 'PENDING_DISBURSAL' && c.borrower_id === currentUserId
+    c => c.status === 'PENDING_DISBURSAL' && c.borrower_id === currentAuthUserId
   );
 
   // Pending disbursal - Lender waiting for borrower to validate
   const pendingDisbursalAsLender = contracts.filter(
-    c => c.status === 'PENDING_DISBURSAL' && c.lender_id === currentUserId
+    c => c.status === 'PENDING_DISBURSAL' && c.lender_id === currentAuthUserId
   );
 
   // Pending settlement - Lender needs to validate borrower's repayment proof
   const pendingSettlementAsLender = contracts.filter(
-    c => c.status === 'PENDING_SETTLEMENT' && c.lender_id === currentUserId
+    c => c.status === 'PENDING_SETTLEMENT' && c.lender_id === currentAuthUserId
   );
 
   // Pending settlement - Borrower waiting for lender to validate
   const pendingSettlementAsBorrower = contracts.filter(
-    c => c.status === 'PENDING_SETTLEMENT' && c.borrower_id === currentUserId
+    c => c.status === 'PENDING_SETTLEMENT' && c.borrower_id === currentAuthUserId
   );
   
   const activeContracts = contracts.filter(
-    (c) => (c.borrower_id === currentUserId || c.lender_id === currentUserId) && 
+    (c) => (c.borrower_id === currentAuthUserId || c.lender_id === currentAuthUserId) && 
     (c.status === 'ACTIVE' || c.status === 'DUE')
   );
   
   const youOwe = contracts.filter(
-    c => c.borrower_id === currentUserId && (c.status === 'ACTIVE' || c.status === 'DUE')
+    c => c.borrower_id === currentAuthUserId && (c.status === 'ACTIVE' || c.status === 'DUE')
   );
   
   const theyOweYou = contracts.filter(
-    c => c.lender_id === currentUserId && (c.status === 'ACTIVE' || c.status === 'DUE')
+    c => c.lender_id === currentAuthUserId && (c.status === 'ACTIVE' || c.status === 'DUE')
   );
 
   const totalLent = theyOweYou.reduce((sum, c) => sum + c.amount, 0);
@@ -492,21 +535,35 @@ export default function Dashboard() {
       <MobileHeader 
         rightElement={
           <NotificationBell 
-            userId={currentUserId} 
+            userId={currentAuthUserId} 
             onNotificationClick={() => setShowReminderManager(true)}
           />
         }
       />
       
       <main className="flex-1 space-y-4 px-4 sm:px-6 py-6 pb-safe overflow-y-auto">
-        {/* Development Tools */}
-        {(import.meta.env.MODE === 'development' || import.meta.env.MODE === 'demo') && (
+        {/* Admin Mode Toggle - Only for admins */}
+        {currentIsAdmin && (
+          <div className="mb-4">
+            <AdminModeToggle 
+              currentMode={currentMode}
+              onModeChange={changeMode}
+            />
+          </div>
+        )}
+
+        {/* Development Tools - Only in demo mode or for admins */}
+        {(currentMode === 'demo' || currentIsAdmin) && (
           <div className="space-y-4 mb-4">
             <div className="bg-muted/50 border border-dashed rounded-md p-3">
               <div className="flex items-center justify-between">
                 <div className="text-sm">
-                  <p className="font-semibold">Development Mode</p>
-                  <p className="text-xs text-muted-foreground">Demo data with payment proofs</p>
+                  <p className="font-semibold">
+                    {currentMode === 'demo' ? 'Demo Mode' : 'Admin Mode'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {currentMode === 'demo' ? 'Demo data with payment proofs' : 'Admin access to all features'}
+                  </p>
                 </div>
                 <Button
                   variant="outline"
@@ -522,17 +579,68 @@ export default function Dashboard() {
                 </Button>
               </div>
             </div>
+
+            {/* Demo User Selection - Only in demo mode */}
+            {currentMode === 'demo' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-blue-800 mb-3">👥 Demo User Selection</h3>
+                <p className="text-sm text-blue-700 mb-3">Switch between different demo users to test different perspectives:</p>
+                <div className="grid grid-cols-1 gap-2">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3 h-auto py-3 hover:bg-primary/5"
+                    onClick={() => handleUserSelect('+919000011111', 'Borrower A')}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="font-semibold text-sm">Borrower A</div>
+                      <div className="text-xs text-muted-foreground">+919000011111</div>
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3 h-auto py-3 hover:bg-primary/5"
+                    onClick={() => handleUserSelect('+919000033333', 'Borrower B')}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="font-semibold text-sm">Borrower B</div>
+                      <div className="text-xs text-muted-foreground">+919000033333</div>
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3 h-auto py-3 hover:bg-primary/5"
+                    onClick={() => handleUserSelect('+919000022222', 'Lender L1')}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="font-semibold text-sm">Lender L1</div>
+                      <div className="text-xs text-muted-foreground">+919000022222</div>
+                    </div>
+                  </Button>
+                </div>
+              </div>
+            )}
             
             {/* Debug Info Panel */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
               <h3 className="text-lg font-semibold text-yellow-800 mb-2">🔍 Phase 2 Debug Info</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>Mode: <span className="font-mono">{import.meta.env.VITE_APP_MODE}</span></div>
+                <div>Mode: <span className="font-mono">{currentMode}</span></div>
                 <div>Security Tests: <span className={showSecurityTests ? "text-green-600" : "text-red-600"}>{showSecurityTests ? "✅ ON" : "❌ OFF"}</span></div>
                 <div>UI/UX Tests: <span className={showUIUXTests ? "text-green-600" : "text-red-600"}>{showUIUXTests ? "✅ ON" : "❌ OFF"}</span></div>
                 <div>Debug Panel: <span className={showDebugPanel ? "text-green-600" : "text-red-600"}>{showDebugPanel ? "✅ ON" : "❌ OFF"}</span></div>
                 <div>Is Demo: <span className={isDemo ? "text-green-600" : "text-red-600"}>{isDemo ? "✅ YES" : "❌ NO"}</span></div>
-                <div>Security Env: <span className="font-mono">{import.meta.env.VITE_ENABLE_SECURITY_TESTS}</span></div>
+                <div>Is Admin: <span className={currentIsAdmin ? "text-green-600" : "text-red-600"}>{currentIsAdmin ? "✅ YES" : "❌ NO"}</span></div>
               </div>
             </div>
             
@@ -578,11 +686,11 @@ export default function Dashboard() {
             size="sm" 
             onClick={() => {
               // Navigate to the appropriate profile based on user type
-              const isBorrower = contracts.some(c => c.borrower_id === currentUserId);
+              const isBorrower = contracts.some(c => c.borrower_id === currentAuthUserId);
               if (isBorrower) {
-                navigate(`/borrower/${currentUserId}`);
+                navigate(`/borrower/${currentAuthUserId}`);
               } else {
-                navigate(`/lender/${currentUserId}`);
+                navigate(`/lender/${currentAuthUserId}`);
               }
               // Scroll to top of the page
               setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
@@ -593,6 +701,26 @@ export default function Dashboard() {
             My Profile
           </Button>
         </div>
+
+
+        {/* Back to Admin Dashboard Button - Only in demo mode when not admin */}
+        {currentMode === 'demo' && !currentIsAdmin && (
+          <div className="flex justify-center">
+            <Button
+              variant="default"
+              className="w-full max-w-sm justify-center gap-3 h-auto py-4 bg-amber-500 hover:bg-amber-600 text-white border-amber-600"
+              onClick={handleSwitchBackToAdmin}
+            >
+              <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center">
+                <Shield className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="text-center">
+                <div className="font-semibold text-base">Back to Admin Dashboard</div>
+                <div className="text-xs text-amber-100">Return to admin view</div>
+              </div>
+            </Button>
+          </div>
+        )}
 
         {/* Summary Stats Cards */}
         <div className="grid grid-cols-2 gap-4">
@@ -849,7 +977,7 @@ export default function Dashboard() {
                     <div>
                       <h3 className="font-semibold">{contract.borrower?.name}</h3>
                       <p className="text-xs text-muted-foreground">Borrower</p>
-                      {contract.borrower?.trust_reliability_cached !== null && (
+                      {contract.borrower?.trust_reliability_cached !== null && contract.borrower?.trust_reliability_cached !== undefined && (
                         <div className="flex items-center gap-1 mt-1">
                           <ReliabilityStars score={contract.borrower.trust_reliability_cached} />
                           <span className="text-xs text-muted-foreground">
@@ -1149,7 +1277,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
-                        {contract.borrower_id === currentUserId 
+                        {contract.borrower_id === currentAuthUserId 
                           ? (contract.lender ? getInitials(contract.lender.name) : '?')
                           : (contract.borrower ? getInitials(contract.borrower.name) : '?')
                         }
@@ -1157,16 +1285,16 @@ export default function Dashboard() {
                     </Avatar>
                     <div>
                       <h3 className="font-semibold">
-                        {contract.borrower_id === currentUserId 
+                        {contract.borrower_id === currentAuthUserId 
                           ? contract.lender?.name 
                           : contract.borrower?.name
                         }
                       </h3>
                       <div className="text-xs text-muted-foreground">
-                        {contract.borrower_id === currentUserId ? 'You owe' : 'They owe you'}
+                        {contract.borrower_id === currentAuthUserId ? 'You owe' : 'They owe you'}
                       </div>
                       {/* Show trust score for borrowers */}
-                      {contract.borrower_id !== currentUserId && contract.borrower?.trust_reliability_cached !== null && (
+                      {contract.borrower_id !== currentAuthUserId && contract.borrower?.trust_reliability_cached !== null && contract.borrower?.trust_reliability_cached !== undefined && (
                         <div className="flex items-center gap-1 mt-1">
                           <ReliabilityStars score={contract.borrower.trust_reliability_cached} />
                         </div>
@@ -1202,7 +1330,7 @@ export default function Dashboard() {
                 )}
                 
                 <div className="flex gap-2">
-                  {contract.borrower_id === currentUserId && contract.status === 'ACTIVE' && (
+                  {contract.borrower_id === currentAuthUserId && contract.status === 'ACTIVE' && (
                     <>
                     {contract.settlement_pending ? (
                       <Button 
@@ -1244,7 +1372,7 @@ export default function Dashboard() {
                     </>
                   )}
                   
-                  {contract.lender_id === currentUserId && contract.status === 'PENDING_SETTLEMENT' && contract.settlement_pending && (
+                  {contract.lender_id === currentAuthUserId && contract.status === 'PENDING_SETTLEMENT' && contract.settlement_pending && (
                     <Button 
                       size="sm" 
                       className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
@@ -1302,8 +1430,8 @@ export default function Dashboard() {
         viewOnly={
           // View only if you're the one who uploaded the proof
           proofType === 'disbursal'
-            ? activeContract?.lender_id === currentUserId
-            : activeContract?.borrower_id === currentUserId
+            ? activeContract?.lender_id === currentAuthUserId
+            : activeContract?.borrower_id === currentAuthUserId
         }
       />
 
@@ -1331,7 +1459,7 @@ export default function Dashboard() {
         onOpenChange={setShowContractDetailsDialog}
         contract={activeContract}
         showActions={true}
-        userRole={activeContract?.borrower_id === currentUserId ? 'borrower' : activeContract?.lender_id === currentUserId ? 'lender' : 'viewer'}
+        userRole={activeContract?.borrower_id === currentAuthUserId ? 'borrower' : activeContract?.lender_id === currentAuthUserId ? 'lender' : 'viewer'}
       />
 
       {/* Reminder Manager Dialog */}
@@ -1349,9 +1477,8 @@ export default function Dashboard() {
             </div>
             <div className="p-4">
               <ReminderManager
-                userId={currentUserId}
+                userId={currentAuthUserId}
                 onReminderAction={(action, reminderId) => {
-                  console.log(`Reminder action: ${action} for reminder: ${reminderId}`);
                 }}
               />
             </div>
@@ -1360,7 +1487,7 @@ export default function Dashboard() {
       )}
 
       {/* Fallback In-App Notifications for iOS Chrome */}
-      <InAppNotification userId={currentUserId} />
+      <InAppNotification userId={currentAuthUserId} />
       
       {/* Security Test Runner - Only show in demo mode */}
       {/* {import.meta.env.MODE === 'development' && (

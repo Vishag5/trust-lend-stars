@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient, User, Contract } from '@/lib/dataClient';
 import { MobileHeader } from '@/components/MobileHeader';
 import { Card } from '@/components/ui/card';
@@ -16,7 +18,13 @@ import { ReliabilityStars } from '@/components/ReliabilityStars';
 export default function SearchProfiles() {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
+  const { currentUserId: prodCurrentUserId } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
   const [searchQuery, setSearchQuery] = useState('');
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [pastLenders, setPastLenders] = useState<User[]>([]);
@@ -25,30 +33,30 @@ export default function SearchProfiles() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUserId) {
+    if (!currentAuthUserId) {
       navigate('/');
       return;
     }
     loadData();
-  }, [currentUserId, navigate]);
+  }, [currentAuthUserId, navigate]);
 
   const loadData = async () => {
-    if (!currentUserId) return;
+    if (!currentAuthUserId) return;
     setLoading(true);
     try {
       const client = getDataClient();
       
       // Load all users
       const users = await client.getUsers();
-      setAllUsers(users.filter(u => u.id !== currentUserId));
+      setAllUsers(users.filter(u => u.id !== currentAuthUserId));
       
       // Load contracts to find past lenders and borrowers
-      const contractsData = await client.getContractsForUser(currentUserId);
+      const contractsData = await client.getContractsForUser(currentAuthUserId);
       setContracts(contractsData);
       
       // Find past lenders (users who lent money to current user)
       const lenderIds = contractsData
-        .filter(c => c.borrower_id === currentUserId && c.status === 'SETTLED')
+        .filter(c => c.borrower_id === currentAuthUserId && c.status === 'SETTLED')
         .map(c => c.lender_id);
       const uniqueLenderIds = [...new Set(lenderIds)];
       const pastLendersData = users.filter(u => uniqueLenderIds.includes(u.id));
@@ -56,7 +64,7 @@ export default function SearchProfiles() {
       
       // Find past borrowers (users who borrowed from current user)
       const borrowerIds = contractsData
-        .filter(c => c.lender_id === currentUserId && c.status === 'SETTLED')
+        .filter(c => c.lender_id === currentAuthUserId && c.status === 'SETTLED')
         .map(c => c.borrower_id);
       const uniqueBorrowerIds = [...new Set(borrowerIds)];
       const pastBorrowersData = users.filter(u => uniqueBorrowerIds.includes(u.id));

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient, Review } from '@/lib/dataClient';
 import { computeReliability, ReliabilityData } from '@/lib/reliability';
 import { ReliabilityStars } from '@/components/ReliabilityStars';
@@ -18,27 +20,35 @@ import {
 export default function Profile() {
   const navigate = useNavigate();
   const { currentUser, currentUserId, logout } = useAuthStore();
+  const { currentUser: prodCurrentUser, currentUserId: prodCurrentUserId, logout: prodLogout } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
   const [reliability, setReliability] = useState<ReliabilityData | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [whyOpen, setWhyOpen] = useState(false);
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUser = isDemoMode ? currentUser : prodCurrentUser;
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
+  const currentLogout = isDemoMode ? logout : prodLogout;
 
   useEffect(() => {
-    if (!currentUserId) {
+    if (!currentAuthUserId) {
       navigate('/');
       return;
     }
     loadProfile();
-  }, [currentUserId, navigate]);
+  }, [currentAuthUserId, navigate]);
 
   const loadProfile = async () => {
-    if (!currentUserId) return;
+    if (!currentAuthUserId) return;
     setLoading(true);
     try {
       const client = getDataClient();
-      const reliabilityData = await computeReliability(currentUserId);
-      const reviewsData = await client.getReviewsForUser(currentUserId);
+      const reliabilityData = await computeReliability(currentAuthUserId);
+      const reviewsData = await client.getReviewsForUser(currentAuthUserId);
       
       setReliability(reliabilityData);
       setReviews(reviewsData);
@@ -53,9 +63,13 @@ export default function Profile() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await currentLogout();
     navigate('/');
+    toast({
+      title: 'Logged out',
+      description: 'You have been successfully logged out',
+    });
   };
 
   if (loading) {
@@ -81,8 +95,8 @@ export default function Profile() {
         <Card className="p-6">
           <div className="space-y-4">
             <div>
-              <h2 className="text-2xl font-bold">{currentUser?.name}</h2>
-              <p className="text-sm text-muted-foreground">{currentUser?.phone}</p>
+              <h2 className="text-2xl font-bold">{currentAuthUser?.name}</h2>
+              <p className="text-sm text-muted-foreground">{currentAuthUser?.phone}</p>
             </div>
 
             {reliability && (

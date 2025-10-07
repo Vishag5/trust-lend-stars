@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient, User, Contract, Review } from '@/lib/dataClient';
 import { MobileHeader } from '@/components/MobileHeader';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -17,7 +19,13 @@ export default function UserProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
+  const { currentUserId: prodCurrentUserId } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
   const [user, setUser] = useState<User | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -27,7 +35,7 @@ export default function UserProfile() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   useEffect(() => {
-    if (!currentUserId) {
+    if (!currentAuthUserId) {
       navigate('/');
       return;
     }
@@ -37,7 +45,7 @@ export default function UserProfile() {
       return;
     }
     loadUserData();
-  }, [currentUserId, id, navigate]);
+  }, [currentAuthUserId, id, navigate]);
 
   // Scroll to top when component mounts
   useEffect(() => {

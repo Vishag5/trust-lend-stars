@@ -12,7 +12,9 @@
     "build:production": "vite build --mode production",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migration:create": "node scripts/create-migration.js",
+    "migration:commit": "node scripts/commit-migrations.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

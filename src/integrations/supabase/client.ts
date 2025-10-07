@@ -5,13 +5,22 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// Use fallback values if environment variables are not available
+const FALLBACK_URL = 'https://leuqcbemxfdeuyjzfvcr.supabase.co';
+const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxldXFjYmVteGZkZXV5anpmdmNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0MDY2MTAsImV4cCI6MjA3Mzk4MjYxMH0.xkIjARluSezewxCgabBfkxrCb5-G5FzezV3gJ9gobBo';
+
+const finalUrl = SUPABASE_URL || FALLBACK_URL;
+const finalKey = SUPABASE_PUBLISHABLE_KEY || FALLBACK_KEY;
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(finalUrl, finalKey, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // Disable email confirmation for development
+    detectSessionInUrl: false,
   }
 });

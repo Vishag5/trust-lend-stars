@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { getDataClient, User } from '@/lib/dataClient';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
+import { getDataClient } from '@/lib/dataClient';
+import { User } from '@/lib/types';
 import { MobileHeader } from '@/components/MobileHeader';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
@@ -13,7 +16,13 @@ export default function LenderProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
+  const { currentUserId: prodCurrentUserId } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,9 +31,9 @@ export default function LenderProfile() {
 
   useEffect(() => {
     console.log('LenderProfile mounted with ID:', id);
-    console.log('Current user ID:', currentUserId);
+    console.log('Current user ID:', currentAuthUserId);
     
-    if (!currentUserId) {
+    if (!currentAuthUserId) {
       console.log('No current user, redirecting to login');
       navigate('/');
       return;
@@ -36,7 +45,7 @@ export default function LenderProfile() {
       return;
     }
     loadUserData();
-  }, [currentUserId, id, navigate]);
+  }, [currentAuthUserId, id, navigate]);
 
   // Scroll to top when component mounts
   useEffect(() => {

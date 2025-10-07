@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
+import { ADMIN_CONFIG } from '@/lib/adminConfig';
 
 interface AuthState {
   currentUserId: string | null;
   currentUser: { id: string; name: string; phone: string; email?: string } | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isAdmin: boolean;
+  adminType: 'email' | 'phone' | null;
   setCurrentUser: (user: { id: string; name: string; phone: string; email?: string } | null) => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
@@ -21,12 +24,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   currentUser: null,
   isAuthenticated: false,
   isLoading: false,
+  isAdmin: false,
+  adminType: null,
 
-  setCurrentUser: (user) => set({ 
-    currentUser: user, 
-    currentUserId: user?.id || null,
-    isAuthenticated: !!user 
-  }),
+  setCurrentUser: (user) => {
+    const isAdmin = user ? ADMIN_CONFIG.isAdmin(user.email || '', user.phone) : false;
+    const adminType = user ? ADMIN_CONFIG.getAdminType(user.email || '', user.phone) : null;
+    
+    set({ 
+      currentUser: user, 
+      currentUserId: user?.id || null,
+      isAuthenticated: !!user,
+      isAdmin,
+      adminType
+    });
+  },
 
   login: async (email, password) => {
     set({ isLoading: true });
@@ -140,7 +152,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       await supabase.auth.signOut();
-      set({ currentUser: null, currentUserId: null, isAuthenticated: false });
+      set({ 
+        currentUser: null, 
+        currentUserId: null, 
+        isAuthenticated: false,
+        isAdmin: false,
+        adminType: null
+      });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient, Contract } from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
 import { Clock, CheckCircle, XCircle, LogOut } from 'lucide-react';
@@ -23,7 +25,13 @@ interface ContractCardProps {
 export function ContractCard({ contract, onUpdate }: ContractCardProps) {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
+  const { currentUserId: prodCurrentUserId } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
   
   const [showExtensionDialog, setShowExtensionDialog] = useState(false);
   const [showSettleDialog, setShowSettleDialog] = useState(false);
@@ -31,8 +39,8 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
   const [showContractDetailsDialog, setShowContractDetailsDialog] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
 
-  const isBorrower = contract.borrower_id === currentUserId;
-  const isLender = contract.lender_id === currentUserId;
+  const isBorrower = contract.borrower_id === currentAuthUserId;
+  const isLender = contract.lender_id === currentAuthUserId;
 
   useEffect(() => {
     const checkExistingReview = async () => {
@@ -40,7 +48,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
         try {
           const client = getDataClient();
           const reviews = await client.getReviewsForUser(contract.borrower_id);
-          const existingReview = reviews.find(r => r.contract_id === contract.id && r.reviewer_id === currentUserId);
+          const existingReview = reviews.find(r => r.contract_id === contract.id && r.reviewer_id === currentAuthUserId);
           console.log('ContractCard - Checking review for contract:', contract.id);
           console.log('ContractCard - All reviews for borrower:', reviews);
           console.log('ContractCard - Existing review found:', existingReview);
@@ -49,291 +57,274 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
           console.error('Error checking existing review:', error);
           setHasReviewed(false); // Default to false on error
         }
-      } else {
-        setHasReviewed(false); // Reset to false if not a lender or not settled
       }
     };
-    checkExistingReview();
-  }, [contract.id, contract.borrower_id, contract.status, isLender, currentUserId]);
 
+    checkExistingReview();
+  }, [isLender, contract.status, contract.borrower_id, contract.id, currentAuthUserId]);
 
   const handleExtensionSubmit = async (newDueDate: Date, reason: string) => {
     try {
       const client = getDataClient();
-      const extraDays = Math.ceil((newDueDate.getTime() - new Date(contract.due_at).getTime()) / (1000 * 60 * 60 * 24));
       await client.createExtension({
         contract_id: contract.id,
         new_due_at: newDueDate.toISOString(),
-        reason,
-        extra_days: extraDays,
+        reason: reason,
       });
+      
+      toast({
+        title: 'Extension Requested',
+        description: 'Your extension request has been submitted',
+      });
+      
       setShowExtensionDialog(false);
-      toast({ title: 'Extension request sent' });
       onUpdate();
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to send extension request', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'Failed to request extension',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleSettleSubmit = async (proofUrl: string) => {
+  const handleSettleSubmit = async (proofUrl: string, notes?: string) => {
     try {
       const client = getDataClient();
-      await client.updateContract(contract.id, { 
-        status: 'DUE',
-        repayment_proof_url: proofUrl,
-        settlement_pending: true,
+      await client.settleContract(contract.id, proofUrl);
+      
+      toast({
+        title: 'Payment Proof Submitted',
+        description: 'Your payment proof has been submitted for verification',
       });
+      
       setShowSettleDialog(false);
-      toast({ title: 'Settlement proof uploaded. Awaiting lender approval.' });
       onUpdate();
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to upload proof', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'Failed to submit payment proof',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleReviewSubmit = async (rating: number, review: string) => {
     try {
       const client = getDataClient();
-      console.log('ContractCard - Submitting review for contract:', contract.id);
-      console.log('ContractCard - Review details:', { rating, review, contract_id: contract.id, reviewer_id: currentUserId, reviewee_id: contract.borrower_id });
-      
       await client.createReview({
-        contract_id: contract.id,
-        reviewer_id: currentUserId,
-        reviewee_id: contract.borrower_id,
-        rating,
-        review: review || null,
+        reviewer_id: currentAuthUserId,
+        reviewed_user_id: contract.borrower_id,
+        rating: rating,
+        comment: review,
       });
       
-      console.log('ContractCard - Review submitted successfully, setting hasReviewed to true');
+      toast({
+        title: 'Review Submitted',
+        description: 'Your review has been submitted',
+      });
+      
+      setShowReviewDialog(false);
       setHasReviewed(true);
-      toast({ title: 'Review submitted successfully!' });
       onUpdate();
     } catch (error) {
-      console.error('ContractCard - Error submitting review:', error);
-      toast({ title: 'Error', description: 'Failed to submit review', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'Failed to submit review',
+        variant: 'destructive',
+      });
     }
   };
 
-  const renderActionButtons = () => {
-    // BORROWER ACTIONS
-    if (isBorrower) {
-      const buttons = [];
+  const handleAcceptContract = async () => {
+    try {
+      const client = getDataClient();
+      await client.updateContract(contract.id, { status: 'ACTIVE' });
       
-      if (contract.status === 'ACTIVE') {
-        if (contract.settlement_pending) {
-          buttons.push(
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="w-full min-w-0 touch-target"
-              onClick={(e) => { e.stopPropagation(); }}
-            >
-              Awaiting Approval
-            </Button>
-          );
-        } else {
-          buttons.push(
-            <Button 
-              size="sm" 
-              className="w-full bg-success hover:bg-success/90 touch-target"
-              onClick={(e) => { e.stopPropagation(); setShowSettleDialog(true); }}
-            >
-              Mark as Paid
-            </Button>
-          );
-        }
-        
-        if (!contract.extension_pending) {
-          buttons.push(
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="w-full min-w-0 touch-target"
-                  onClick={(e) => { 
-                    e.stopPropagation();
-                    setShowExtensionDialog(true);
-                  }}
-                >
-                  <Clock className="mr-2 h-4 w-4" />
-              Request Extension
-                </Button>
-          );
-        }
-      }
+      toast({
+        title: 'Contract Accepted',
+        description: 'The loan has been approved',
+      });
       
-      return buttons.length > 0 ? (
-        <div className="flex gap-2">
-          {buttons}
-        </div>
-      ) : null;
+      onUpdate();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to accept contract',
+        variant: 'destructive',
+      });
     }
+  };
 
-    // LENDER ACTIONS
-    if (isLender) {
-      const buttons = [];
+  const handleRejectContract = async () => {
+    try {
+      const client = getDataClient();
+      await client.updateContract(contract.id, { status: 'REJECTED' });
       
-      if (contract.status === 'REQUESTED') {
-        buttons.push(
-            <Button 
-              size="sm" 
-              className="w-full bg-success hover:bg-success/90 touch-target"
-            onClick={(e) => { e.stopPropagation(); }}
-            >
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Accept
-            </Button>
-        );
-        buttons.push(
-          <Button 
-            size="sm" 
-            variant="destructive" 
-            className="w-full min-w-0"
-            onClick={(e) => { e.stopPropagation(); }}
-          >
-            <XCircle className="mr-2 h-4 w-4" />
-            Reject
-          </Button>
-        );
-      }
+      toast({
+        title: 'Contract Rejected',
+        description: 'The loan request has been declined',
+      });
       
-      if (contract.status === 'DUE' && contract.settlement_pending) {
-          buttons.push(
-            <Button 
-              size="sm" 
-            className="w-full bg-primary hover:bg-primary/90 touch-target"
-            onClick={(e) => { e.stopPropagation(); }}
-            >
-            Review Settlement
-            </Button>
-          );
-        }
-        
-      // Show "Rate & Review" button for lenders on SETTLED contracts
-      if (contract.status === 'SETTLED' && !contract.settlement_pending) {
-        console.log('ContractCard - Rendering review button for contract:', contract.id, 'hasReviewed:', hasReviewed);
-        if (hasReviewed) {
-          buttons.push(
-            <Button
-              key="reviewed"
-              size="sm"
-              variant="outline"
-              className="w-full min-w-0 touch-target"
-              disabled
-            >
-              ✓ Reviewed
-            </Button>
-          );
-        } else {
-          buttons.push(
-            <Button
-              key="review"
-              size="sm"
-              variant="outline"
-              className="w-full min-w-0 touch-target"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowReviewDialog(true);
-              }}
-            >
-              Rate & Review
-            </Button>
-          );
-        }
-      }
-      
-      if (buttons.length > 0) {
-        return (
-          <div className="flex gap-2">
-            {buttons}
-          </div>
-        );
-      }
+      onUpdate();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to reject contract',
+        variant: 'destructive',
+      });
     }
-    
-    return null;
+  };
+
+  const handleViewDetails = () => {
+    setShowContractDetailsDialog(true);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'REQUESTED': return 'bg-yellow-100 text-yellow-800';
+      case 'ACTIVE': return 'bg-blue-100 text-blue-800';
+      case 'SETTLED': return 'bg-green-100 text-green-800';
+      case 'REJECTED': return 'bg-red-100 text-red-800';
+      case 'DUE': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'REQUESTED': return 'Pending Approval';
+      case 'ACTIVE': return 'Active';
+      case 'SETTLED': return 'Settled';
+      case 'REJECTED': return 'Rejected';
+      case 'DUE': return 'Due';
+      default: return status;
+    }
+  };
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount);
   };
 
   return (
     <>
-      <Card 
-        className="p-4 cursor-pointer hover:shadow-md transition-shadow touch-target card-mobile"
-        onClick={() => setShowContractDetailsDialog(true)}
-      >
-        <div className="mb-3 flex items-start justify-between">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-lg font-semibold text-primary">
-                {contract.borrower_id === currentUserId 
-                  ? (contract.lender ? contract.lender.name.charAt(0).toUpperCase() : '?')
-                  : (contract.borrower ? contract.borrower.name.charAt(0).toUpperCase() : '?')
-                }
-              </span>
+      <Card className="p-4 hover:shadow-md transition-shadow">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge className={getStatusColor(contract.status)}>
+                {getStatusText(contract.status)}
+              </Badge>
+              {contract.settlement_pending && (
+                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                  Settlement Pending
+                </Badge>
+              )}
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm leading-tight">
-                {contract.borrower_id === currentUserId 
-                  ? contract.lender?.name 
-                  : contract.borrower?.name
-                }
-              </h3>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                {contract.borrower_id === currentUserId ? 'You owe' : 'They owe you'}
-              </div>
-              {/* Show trust score for borrowers */}
-              {contract.borrower_id !== currentUserId && contract.borrower?.trust_reliability_cached !== null && (
-                <div className="flex items-center gap-1 mt-1">
-                  <ReliabilityStars score={contract.borrower?.trust_reliability_cached || 0} size="sm" />
-                </div>
+            
+            <div className="space-y-1">
+              <p className="text-lg font-semibold">{formatAmount(contract.amount)}</p>
+              <p className="text-sm text-muted-foreground">
+                Due: {formatDateTime(contract.due_at)}
+              </p>
+              {contract.reason && (
+                <p className="text-sm text-muted-foreground">{contract.reason}</p>
               )}
             </div>
           </div>
-          <div className="flex items-center flex-shrink-0 ml-2">
-          <StatusBadge status={contract.status} />
-        </div>
-        </div>
-        
-        <div className="mb-3 grid grid-cols-2 gap-3 text-sm">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Amount</span>
-            <div className="font-semibold text-base">₹{contract.amount.toLocaleString('en-IN')}</div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Due</span>
-            <div className="font-semibold text-sm leading-tight">{formatDateTime(contract.due_at)}</div>
-          </div>
-        </div>
-        
-        <div className="space-y-1 text-sm">
-          {contract.reason && (
-            <p className="text-muted-foreground text-xs">Reason: {contract.reason}</p>
-          )}
-          {contract.attachment_url && (
-            <p className="text-muted-foreground text-xs">📎 Document attached</p>
-          )}
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleViewDetails}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
 
-        {renderActionButtons()}
-    </Card>
+        {/* User Info */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              {isBorrower ? 'Lender' : 'Borrower'}: {contract.borrower?.name || contract.lender?.name || 'Unknown'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {contract.borrower?.phone || contract.lender?.phone || 'No phone'}
+            </p>
+          </div>
+          <ReliabilityStars 
+            score={contract.borrower?.trust_reliability_cached || contract.lender?.trust_reliability_cached || 0} 
+            size="sm" 
+          />
+        </div>
 
+        {/* Actions */}
+        <div className="flex flex-wrap gap-2">
+          {contract.status === 'REQUESTED' && isLender && (
+            <>
+              <Button size="sm" onClick={handleAcceptContract} className="bg-green-600 hover:bg-green-700">
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Accept
+              </Button>
+              <Button size="sm" variant="destructive" onClick={handleRejectContract}>
+                <XCircle className="h-4 w-4 mr-1" />
+                Reject
+              </Button>
+            </>
+          )}
+          
+          {contract.status === 'ACTIVE' && isBorrower && !contract.settlement_pending && (
+            <Button size="sm" onClick={() => setShowSettleDialog(true)}>
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Mark as Paid
+            </Button>
+          )}
+          
+          {contract.status === 'ACTIVE' && isBorrower && (
+            <Button size="sm" variant="outline" onClick={() => setShowExtensionDialog(true)}>
+              <Clock className="h-4 w-4 mr-1" />
+              Request Extension
+            </Button>
+          )}
+          
+          {contract.status === 'SETTLED' && isLender && !hasReviewed && (
+            <Button size="sm" variant="outline" onClick={() => setShowReviewDialog(true)}>
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Leave Review
+            </Button>
+          )}
+          
+          <Button size="sm" variant="outline" onClick={handleViewDetails}>
+            View Details
+          </Button>
+        </div>
+      </Card>
+
+      {/* Dialogs */}
       <ExtensionRequestDialog
         open={showExtensionDialog}
         onOpenChange={setShowExtensionDialog}
         onSubmit={handleExtensionSubmit}
-        currentDueDate={contract.due_at}
+        currentDueDate={new Date(contract.due_at)}
       />
 
       <SettleUpDialog
         open={showSettleDialog}
         onOpenChange={setShowSettleDialog}
         onSubmit={handleSettleSubmit}
+        contract={contract}
       />
 
       <ReviewDialog
         open={showReviewDialog}
         onOpenChange={setShowReviewDialog}
         onSubmit={handleReviewSubmit}
-        borrowerName={contract.borrower?.name || 'Unknown'}
+        borrowerName={contract.borrower?.name || 'Borrower'}
       />
 
       <ContractDetailsDialog

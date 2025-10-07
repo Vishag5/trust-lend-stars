@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { MobileHeader } from '@/components/MobileHeader';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient } from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Upload, Calendar as CalendarIcon } from 'lucide-react';
@@ -16,7 +18,27 @@ import { cn } from '@/lib/utils';
 export default function CreateContract() {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
+  const { currentUserId: prodCurrentUserId } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
+  
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!currentAuthUserId) {
+      console.log('CreateContract: No auth user, redirecting to login');
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to create a loan request',
+        variant: 'destructive',
+      });
+      navigate('/');
+    }
+  }, [currentAuthUserId, navigate, toast]);
   
   const [phone, setPhone] = useState('+91 ');
   const [amount, setAmount] = useState('');
@@ -30,11 +52,62 @@ export default function CreateContract() {
   const [loading, setLoading] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  
+  // New state for enhanced phone lookup
+  const [foundUser, setFoundUser] = useState<any>(null);
+  const [phoneLookupLoading, setPhoneLookupLoading] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+
+  // Enhanced phone lookup function
+  const handlePhoneLookup = async (phoneNumber: string) => {
+    if (!phoneNumber || phoneNumber.length < 10) {
+      setFoundUser(null);
+      return;
+    }
+
+    setPhoneLookupLoading(true);
+    try {
+      const client = getDataClient();
+      
+      // Try different phone number formats
+      const formats = [
+        phoneNumber.replace(/\s/g, ''), // Remove spaces: +918891932891
+        phoneNumber.startsWith('+91') ? phoneNumber.replace(/\s/g, '') : `+91${phoneNumber.replace(/^\+91/, '').replace(/\s/g, '')}`, // Ensure +91 prefix without spaces
+        phoneNumber.replace(/^\+91\s?/, '').replace(/\s/g, ''), // Remove +91 prefix and spaces: 8891932891
+        phoneNumber.replace(/\s/g, ''), // Just remove spaces
+      ];
+
+      let foundUser = null;
+      for (const format of formats) {
+        foundUser = await client.getUserByPhone(format);
+        if (foundUser) break;
+      }
+
+      setFoundUser(foundUser);
+    } catch (error) {
+      console.error('Phone lookup error:', error);
+      setFoundUser(null);
+    } finally {
+      setPhoneLookupLoading(false);
+    }
+  };
+
+  // Trigger phone lookup when phone number changes
+  useEffect(() => {
+    if (phone && phone.length >= 10) {
+      const timeoutId = setTimeout(() => {
+        handlePhoneLookup(phone);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setFoundUser(null);
+    }
+  }, [phone]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!currentUserId) {
+    if (!currentAuthUserId) {
       toast({
         title: 'Error',
         description: 'Please log in first',
@@ -109,22 +182,17 @@ export default function CreateContract() {
     try {
       const client = getDataClient();
       
-      // Find lender by phone
-      const lender = await client.getUserByPhone(phone.replace(/\s/g, ''));
-      if (!lender) {
-        toast({
-          title: 'Lender not found',
-          description: 'No user found with this phone number. Would you like to invite them?',
-          variant: 'destructive',
-        });
+      // Check if user is found
+      if (!foundUser) {
+        setShowInviteDialog(true);
         setLoading(false);
         return;
       }
 
-      // Create contract
+      // Create contract with found user
       await client.createContract({
-        borrower_id: currentUserId,
-        lender_id: lender.id,
+        borrower_id: currentAuthUserId,
+        lender_id: foundUser.id,
         amount: amountNum,
         due_at: due.toISOString(),
         reason: reason || null,
@@ -133,14 +201,30 @@ export default function CreateContract() {
 
       toast({
         title: 'Loan request sent!',
-        description: 'The lender will receive a notification to review your request',
+        description: `Your request has been sent to ${foundUser.name}`,
       });
       
       navigate('/dashboard');
     } catch (error) {
+      console.error('Create contract error:', error);
+      
+      // Handle specific error types
+      let errorMessage = 'Failed to create loan request';
+      if (error.message?.includes('Failed to fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message?.includes('400')) {
+        errorMessage = 'Invalid request. Please check your data and try again.';
+      } else if (error.message?.includes('401')) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (error.message?.includes('403')) {
+        errorMessage = 'Permission denied. Please check your account status.';
+      } else if (error.message) {
+        errorMessage = `Failed to create loan request: ${error.message}`;
+      }
+      
       toast({
         title: 'Error',
-        description: 'Failed to create loan request',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -204,15 +288,56 @@ export default function CreateContract() {
               
               <div className="space-y-2">
                 <Label htmlFor="phone">Lender's Phone Number *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+91 98765 43210"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  disabled={loading}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+91 98765 43210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={loading}
+                    required
+                    className={foundUser ? 'border-green-500' : foundUser === false ? 'border-red-500' : ''}
+                  />
+                  {phoneLookupLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Show found user info */}
+                {foundUser && (
+                  <div className="rounded-md bg-green-50 border border-green-200 p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <span className="text-sm font-medium text-green-700">
+                          {foundUser.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-900">{foundUser.name}</p>
+                        <p className="text-xs text-green-700">{foundUser.phone}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Show not found message */}
+                {!foundUser && phone.length > 10 && !phoneLookupLoading && (
+                  <div className="rounded-md bg-red-50 border border-red-200 p-3">
+                    <p className="text-sm text-red-700">
+                      No user found with this phone number. 
+                      <button 
+                        type="button"
+                        onClick={() => setShowInviteDialog(true)}
+                        className="ml-1 text-red-600 underline hover:text-red-800"
+                      >
+                        Invite them to join
+                      </button>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -431,6 +556,54 @@ export default function CreateContract() {
           </form>
         </Card>
       </main>
+      
+      {/* Invite Dialog */}
+      {showInviteDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Invite to LenTrust</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              The person with phone number <strong>{phone}</strong> is not registered on LenTrust. 
+              You can invite them to join the platform.
+            </p>
+            
+            <div className="space-y-3">
+              <Button
+                onClick={() => {
+                  const phoneNumber = phone.replace(/\D/g, '');
+                  const whatsappUrl = `https://wa.me/91${phoneNumber}?text=Hi! I'd like to invite you to join LenTrust, a secure platform for lending and borrowing money. Sign up at: https://lentrust.app`;
+                  window.open(whatsappUrl, '_blank');
+                  setShowInviteDialog(false);
+                }}
+                className="w-full"
+              >
+                Send WhatsApp Invite
+              </Button>
+              
+              <Button
+                onClick={() => {
+                  const phoneNumber = phone.replace(/\D/g, '');
+                  const smsUrl = `sms:${phoneNumber}?body=Hi! I'd like to invite you to join LenTrust, a secure platform for lending and borrowing money. Sign up at: https://lentrust.app`;
+                  window.open(smsUrl, '_blank');
+                  setShowInviteDialog(false);
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                Send SMS Invite
+              </Button>
+              
+              <Button
+                onClick={() => setShowInviteDialog(false)}
+                variant="ghost"
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

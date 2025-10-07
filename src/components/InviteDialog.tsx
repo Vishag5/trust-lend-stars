@@ -10,7 +10,8 @@ interface InviteDialogProps {
 
 export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
   const inviteLink = useMemo(() => {
-    const base = window.location.origin.replace(/\/$/, '');
+    // Use production URL for sharing
+    const base = 'https://lentrust.app'; // Production URL
     const code = 'abc123';
     return `${base}/invite/${code}`;
   }, []);

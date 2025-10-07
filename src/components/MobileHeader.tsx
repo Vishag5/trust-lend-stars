@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { UserSwitcher } from './UserSwitcher';
-import { Share2, ArrowLeft, Menu, LogOut } from 'lucide-react';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
+import { Share2, ArrowLeft, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { InviteDialog } from '@/components/InviteDialog';
@@ -15,10 +16,17 @@ interface MobileHeaderProps {
 
 export function MobileHeader({ title, showBack = false, rightElement }: MobileHeaderProps) {
   const { currentUser, logout } = useAuthStore();
+  const { currentUser: prodCurrentUser, logout: prodLogout } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [inviteOpen, setInviteOpen] = useState(false);
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUser = isDemoMode ? currentUser : prodCurrentUser;
+  const currentLogout = isDemoMode ? logout : prodLogout;
 
   const handleInvite = () => {
     setInviteOpen(true);
@@ -28,8 +36,8 @@ export function MobileHeader({ title, showBack = false, rightElement }: MobileHe
     navigate(-1);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await currentLogout();
     navigate('/');
     toast({
       title: 'Logged out',
@@ -52,9 +60,9 @@ export function MobileHeader({ title, showBack = false, rightElement }: MobileHe
             <h1 className="text-xl font-bold text-white">
               {title || (isDashboard ? 'LenTrust 🧡' : 'LenTrust')}
             </h1>
-            {isDashboard && currentUser && (
+            {isDashboard && currentAuthUser && (
               <p className="text-xs text-white/80">
-                {currentUser.name} • {currentUser.phone}
+                {currentAuthUser.name} • {currentAuthUser.phone}
               </p>
             )}
           </div>
@@ -83,7 +91,6 @@ export function MobileHeader({ title, showBack = false, rightElement }: MobileHe
           >
             <LogOut className="h-4 w-4" />
           </Button>
-          <UserSwitcher />
         </div>
       </div>
       <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient, Contract } from '@/lib/dataClient';
 import { MobileHeader } from '@/components/MobileHeader';
 import { ContractCard } from '@/components/ContractCard';
@@ -10,24 +12,30 @@ import { useToast } from '@/hooks/use-toast';
 export default function Contracts() {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
+  const { currentUserId: prodCurrentUserId } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUserId) {
+    if (!currentAuthUserId) {
       navigate('/');
       return;
     }
     loadContracts();
-  }, [currentUserId, navigate]);
+  }, [currentAuthUserId, navigate]);
 
   const loadContracts = async () => {
-    if (!currentUserId) return;
+    if (!currentAuthUserId) return;
     setLoading(true);
     try {
       const client = getDataClient();
-      const data = await client.getContractsForUser(currentUserId);
+      const data = await client.getContractsForUser(currentAuthUserId);
       setContracts(data);
     } catch (error) {
       toast({

@@ -1,40 +1,63 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
 import { getDataClient } from '@/lib/dataClient';
 import { seedDemoData, DEMO_USERS } from '@/lib/seedData';
 import { useToast } from '@/hooks/use-toast';
 import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
 import { PhoneAuthForm } from '@/components/auth/PhoneAuthForm';
-import { UserOnboarding } from '@/components/auth/UserOnboarding';
-import { User, Chrome, Phone, Shield } from 'lucide-react';
+import { EmailPasswordForm } from '@/components/auth/EmailPasswordForm';
+import { OnboardingForm } from '@/components/OnboardingForm';
+import { User, Chrome, Phone, Shield, Mail } from 'lucide-react';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+import { useModeManager } from '@/hooks/useModeManager';
+import { ADMIN_CONFIG } from '@/lib/adminConfig';
 
 export default function Login() {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, isAuthenticated, checkAuth } = useAuthStore();
+  const { currentUser: prodCurrentUser, isAuthenticated: prodIsAuthenticated, checkAuth: prodCheckAuth } = useProductionAuthStore();
   const { toast } = useToast();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [authUser, setAuthUser] = useState<any>(null);
   
+  // Mode management - Use same method as Dashboard
+  const { currentMode } = useModeManager();
+  const isDemoMode = currentMode === 'demo';
+  
   // Feature flags
-  const isDemoMode = useFeatureFlag('guestAccess');
   const showDebugInfo = useFeatureFlag('debugPanel');
+  
+  // Debug: Log mode detection (temporarily enabled for debugging)
+  // console.log('Login.tsx - currentMode:', currentMode);
+  // console.log('Login.tsx - isDemoMode:', isDemoMode);
+  
+  // Use appropriate auth store based on mode
+  const currentAuthUser = isDemoMode ? currentUser : prodCurrentUser;
+  const currentIsAuthenticated = isDemoMode ? isAuthenticated : prodIsAuthenticated;
+  
+  // Stabilize the checkAuth function to prevent infinite loops
+  const currentCheckAuth = useCallback(() => {
+    if (isDemoMode) {
+      checkAuth();
+    } else {
+      prodCheckAuth();
+    }
+  }, [isDemoMode, checkAuth, prodCheckAuth]);
 
   useEffect(() => {
     // Check authentication status
-    checkAuth();
+    currentCheckAuth();
     
     // Seed demo data on first load (only in demo mode)
     if (isDemoMode) {
       const initializeData = async () => {
-        console.log('Login: Initializing seed data...');
         try {
           await seedDemoData();
-          console.log('Login: Seed data initialized successfully');
         } catch (error) {
           console.error('Login: Error seeding data:', error);
         }
@@ -43,10 +66,24 @@ export default function Login() {
     }
 
     // If already logged in, go to dashboard
-    if (isAuthenticated && currentUser) {
+    if (currentIsAuthenticated && currentAuthUser) {
       navigate('/dashboard');
     }
-  }, [currentUser, isAuthenticated, navigate, checkAuth, isDemoMode]);
+  }, [currentAuthUser, currentIsAuthenticated, navigate, currentCheckAuth, isDemoMode, currentMode]);
+
+  // Add a separate effect to handle logout redirects
+  useEffect(() => {
+    // Check if we're coming from a logout (no user but was authenticated)
+    const handleLogoutRedirect = () => {
+      // If we're in production mode and no user is found, ensure we stay on login page
+      if (!isDemoMode && !currentAuthUser && !currentIsAuthenticated) {
+        // Force clear any remaining state
+        console.log('Login: Handling logout redirect - staying on login page');
+      }
+    };
+
+    handleLogoutRedirect();
+  }, [isDemoMode, currentAuthUser, currentIsAuthenticated]);
 
   const handleUserSelect = async (phone: string, name: string) => {
     try {
@@ -55,9 +92,14 @@ export default function Login() {
       
       if (user) {
         setCurrentUser(user);
+        
+        // Check if user is admin
+        const isAdmin = ADMIN_CONFIG.isAdmin(user.email || '', user.phone);
+        const adminType = ADMIN_CONFIG.getAdminType(user.email || '', user.phone);
+        
         toast({
           title: `Welcome, ${name}!`,
-          description: `Logged in as ${phone}`,
+          description: isAdmin ? `Admin access granted (${adminType})` : `Logged in as ${phone}`,
         });
         navigate('/dashboard');
       }
@@ -89,7 +131,7 @@ export default function Login() {
   if (showOnboarding && authUser) {
     return (
       <div className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-gradient-to-br from-primary/10 via-background to-background px-4 sm:px-6">
-        <UserOnboarding
+        <OnboardingForm
           user={authUser}
           onComplete={handleOnboardingComplete}
           onError={(error) => {
@@ -99,7 +141,7 @@ export default function Login() {
               variant: 'destructive',
             });
           }}
-          className="w-full max-w-md"
+          className="w-full max-w-2xl"
         />
       </div>
     );
@@ -177,6 +219,21 @@ export default function Login() {
                   <div className="text-xs text-muted-foreground">{DEMO_USERS.LENDER_L1.phone}</div>
                 </div>
               </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3 h-auto py-4 sm:py-5 hover:bg-primary/5 transition-all active:scale-[0.98] border-amber-200 bg-amber-50"
+                onClick={() => handleUserSelect(DEMO_USERS.ADMIN.phone, DEMO_USERS.ADMIN.name)}
+              >
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-amber-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-base">{DEMO_USERS.ADMIN.name}</div>
+                  <div className="text-xs text-muted-foreground">{DEMO_USERS.ADMIN.phone}</div>
+                  <div className="text-xs text-amber-600 font-medium">Admin Access</div>
+                </div>
+              </Button>
             </div>
 
             <p className="text-center text-xs text-muted-foreground pt-2">
@@ -184,52 +241,18 @@ export default function Login() {
             </p>
           </div>
         ) : (
-          // Production Mode - Show authentication options
-          <Tabs defaultValue="google" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="google" className="flex items-center gap-2">
-                <Chrome className="h-4 w-4" />
-                Google
-              </TabsTrigger>
-              <TabsTrigger value="phone" className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                Phone
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="google" className="space-y-4">
-              <div className="text-center space-y-2">
-                <Shield className="h-8 w-8 mx-auto text-primary" />
-                <h3 className="text-lg font-semibold">Sign in with Google</h3>
-                <p className="text-sm text-muted-foreground">
-                  Quick and secure authentication
-                </p>
-              </div>
-              <GoogleAuthButton
-                onSuccess={handleAuthSuccess}
-                onError={(error) => {
-                  toast({
-                    title: 'Authentication Error',
-                    description: error.message || 'Google sign-in failed',
-                    variant: 'destructive',
-                  });
-                }}
-              />
-            </TabsContent>
-            
-            <TabsContent value="phone" className="space-y-4">
-              <PhoneAuthForm
-                onSuccess={handleAuthSuccess}
-                onError={(error) => {
-                  toast({
-                    title: 'Authentication Error',
-                    description: error.message || 'Phone authentication failed',
-                    variant: 'destructive',
-                  });
-                }}
-              />
-            </TabsContent>
-          </Tabs>
+          // Production Mode - Show basic email/password authentication
+          <EmailPasswordForm
+            onSuccess={handleAuthSuccess}
+            onError={(error) => {
+              toast({
+                title: 'Authentication Error',
+                description: error.message || 'Authentication failed',
+                variant: 'destructive',
+              });
+            }}
+            className="w-full"
+          />
         )}
 
         {showDebugInfo && (

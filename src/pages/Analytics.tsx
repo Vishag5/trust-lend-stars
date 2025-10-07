@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useProductionAuthStore } from '@/store/productionAuthStore';
+import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient, Contract } from '@/lib/dataClient';
 import { MobileHeader } from '@/components/MobileHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,24 +14,30 @@ import { formatAmount } from '@/lib/format';
 export default function Analytics() {
   const navigate = useNavigate();
   const { currentUserId } = useAuthStore();
+  const { currentUserId: prodCurrentUserId } = useProductionAuthStore();
+  const { currentMode } = useModeManager();
   const { toast } = useToast();
+  
+  // Use appropriate auth store based on mode
+  const isDemoMode = currentMode === 'demo';
+  const currentAuthUserId = isDemoMode ? currentUserId : prodCurrentUserId;
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUserId) {
+    if (!currentAuthUserId) {
       navigate('/');
       return;
     }
     loadAnalytics();
-  }, [currentUserId, navigate]);
+  }, [currentAuthUserId, navigate]);
 
   const loadAnalytics = async () => {
-    if (!currentUserId) return;
+    if (!currentAuthUserId) return;
     setLoading(true);
     try {
       const client = getDataClient();
-      const data = await client.getContractsForUser(currentUserId);
+      const data = await client.getContractsForUser(currentAuthUserId);
       setContracts(data);
     } catch (error) {
       toast({
@@ -44,11 +52,11 @@ export default function Analytics() {
 
   const getStats = () => {
     const totalLent = contracts
-      .filter(c => c.lender_id === currentUserId && c.status === 'SETTLED')
+      .filter(c => c.lender_id === currentAuthUserId && c.status === 'SETTLED')
       .reduce((sum, c) => sum + c.amount, 0);
     
     const totalBorrowed = contracts
-      .filter(c => c.borrower_id === currentUserId && c.status === 'SETTLED')
+      .filter(c => c.borrower_id === currentAuthUserId && c.status === 'SETTLED')
       .reduce((sum, c) => sum + c.amount, 0);
     
     const activeLoans = contracts.filter(c => c.status === 'ACTIVE').length;
