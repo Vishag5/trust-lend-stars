@@ -77,8 +77,16 @@ export function EmailPasswordForm({ onSuccess, onError, className }: EmailPasswo
 
     setForgotPasswordLoading(true);
     try {
+      // Use production URL for password reset redirect
+      const productionUrl = 'https://trust-lend-stars-3f418vgw7-vishag-ts-projects.vercel.app';
+      const redirectUrl = window.location.hostname === 'localhost' ? 
+        `${window.location.origin}/reset-password` : 
+        `${productionUrl}/reset-password`;
+      
+      console.log('Password reset redirect URL:', redirectUrl);
+      
       const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: redirectUrl,
       });
 
       if (error) {
