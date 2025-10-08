@@ -350,6 +350,48 @@ class AuthService {
     }
   }
 
+  // Handle OAuth user (Google, etc.)
+  async handleOAuthUser(authUser: any): Promise<{ success: boolean; user?: User; error?: string }> {
+    try {
+      // Check if user exists in our users table
+      let { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', authUser.email)
+        .single();
+
+      if (profileError && profileError.code === 'PGRST116') {
+        // User doesn't exist, create them
+        const newUser = {
+          id: authUser.id,
+          name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+          email: authUser.email,
+          phone: authUser.user_metadata?.phone || '',
+          trust_reliability_cached: 0,
+          created_at: new Date().toISOString(),
+        };
+
+        const { data: createdProfile, error: createError } = await supabase
+          .from('users')
+          .insert(newUser)
+          .select()
+          .single();
+
+        if (createError) {
+          return { success: false, error: createError.message };
+        }
+
+        profile = createdProfile;
+      } else if (profileError) {
+        return { success: false, error: profileError.message };
+      }
+
+      return { success: true, user: profile as User };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to handle OAuth user' };
+    }
+  }
+
   // Get current user
   async getCurrentUser(): Promise<{ user: User | null; error?: string }> {
     try {
