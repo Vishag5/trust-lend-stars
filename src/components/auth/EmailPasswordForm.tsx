@@ -78,7 +78,7 @@ export function EmailPasswordForm({ onSuccess, onError, className }: EmailPasswo
     setForgotPasswordLoading(true);
     try {
       // Use production URL for password reset redirect
-      const productionUrl = 'https://trust-lend-stars-3f418vgw7-vishag-ts-projects.vercel.app';
+      const productionUrl = 'https://trust-lend-stars-pb596z43i-vishag-ts-projects.vercel.app';
       const redirectUrl = window.location.hostname === 'localhost' ? 
         `${window.location.origin}/reset-password` : 
         `${productionUrl}/reset-password`;

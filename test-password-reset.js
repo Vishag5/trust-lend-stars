@@ -11,7 +11,7 @@ async function testPasswordResetWithProductionURL() {
   
   try {
     const testEmail = 'info.vishag@gmail.com';
-    const productionUrl = 'https://trust-lend-stars-3f418vgw7-vishag-ts-projects.vercel.app';
+    const productionUrl = 'https://trust-lend-stars-pb596z43i-vishag-ts-projects.vercel.app';
     const redirectUrl = `${productionUrl}/reset-password`;
     
     console.log('📧 Sending password reset email to:', testEmail);
