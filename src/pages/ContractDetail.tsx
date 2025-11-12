@@ -82,11 +82,7 @@ export default function ContractDetail() {
     if (!contract) return;
     try {
       const client = getDataClient();
-      await client.updateContract(contract.id, {
-        status: 'DUE',
-        repayment_proof_url: proofUrl,
-        settlement_pending: true,
-      });
+      await client.settleContract(contract.id, proofUrl);
       setShowSettleDialog(false);
       toast({ title: 'Settlement proof uploaded. Awaiting lender approval.' });
       loadContract();

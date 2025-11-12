@@ -8,7 +8,7 @@ import { useProductionAuthStore } from '@/store/productionAuthStore';
 import { useModeManager } from '@/hooks/useModeManager';
 import { getDataClient, Contract } from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, CheckCircle, XCircle, LogOut } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, LogOut, DollarSign, Package, Briefcase } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ReliabilityStars } from '@/components/ReliabilityStars';
 import { ExtensionRequestDialog } from '@/components/ExtensionRequestDialog';
@@ -117,6 +117,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
         reviewed_user_id: contract.borrower_id,
         rating: rating,
         comment: review,
+        contract_id: contract.id,
       });
       
       toast({
@@ -210,12 +211,72 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
     }).format(amount);
   };
 
+  const getContractTypeIcon = () => {
+    const type = contract.contract_type || 'MONEY';
+    switch (type) {
+      case 'ITEM':
+        return <Package className="h-4 w-4 text-blue-600" />;
+      case 'SERVICE':
+        return <Briefcase className="h-4 w-4 text-purple-600" />;
+      default:
+        return <DollarSign className="h-4 w-4 text-green-600" />;
+    }
+  };
+
+  const getContractTypeLabel = () => {
+    const type = contract.contract_type || 'MONEY';
+    switch (type) {
+      case 'ITEM':
+        return 'Item Lending';
+      case 'SERVICE':
+        return 'Service Agreement';
+      default:
+        return 'Money Lending';
+    }
+  };
+
+  const getAmountLabel = () => {
+    const type = contract.contract_type || 'MONEY';
+    if (type === 'ITEM') {
+      return contract.item_title || 'Item';
+    }
+    return formatAmount(contract.amount);
+  };
+
+  const getDueDateLabel = () => {
+    const type = contract.contract_type || 'MONEY';
+    switch (type) {
+      case 'ITEM':
+        return 'Return by';
+      case 'SERVICE':
+        return 'Complete by';
+      default:
+        return 'Due';
+    }
+  };
+
+  const getSettleLabel = () => {
+    const type = contract.contract_type || 'MONEY';
+    switch (type) {
+      case 'ITEM':
+        return 'Mark as Returned';
+      case 'SERVICE':
+        return 'Submit Completion';
+      default:
+        return 'Mark as Paid';
+    }
+  };
+
   return (
     <>
       <Card className="p-4 hover:shadow-md transition-shadow">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-xs font-medium">
+                {getContractTypeIcon()}
+                {getContractTypeLabel()}
+              </div>
               <Badge className={getStatusColor(contract.status)}>
                 {getStatusText(contract.status)}
               </Badge>
@@ -227,9 +288,12 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
             </div>
             
             <div className="space-y-1">
-              <p className="text-lg font-semibold">{formatAmount(contract.amount)}</p>
+              <p className="text-lg font-semibold">{getAmountLabel()}</p>
+              {contract.contract_type === 'ITEM' && contract.item_estimated_value && (
+                <p className="text-xs text-muted-foreground">Value: {formatAmount(contract.item_estimated_value)}</p>
+              )}
               <p className="text-sm text-muted-foreground">
-                Due: {formatDateTime(contract.due_at)}
+                {getDueDateLabel()}: {formatDateTime(contract.due_at)}
               </p>
               {contract.reason && (
                 <p className="text-sm text-muted-foreground">{contract.reason}</p>
@@ -281,7 +345,7 @@ export function ContractCard({ contract, onUpdate }: ContractCardProps) {
           {contract.status === 'ACTIVE' && isBorrower && !contract.settlement_pending && (
             <Button size="sm" onClick={() => setShowSettleDialog(true)}>
               <CheckCircle className="h-4 w-4 mr-1" />
-              Mark as Paid
+              {getSettleLabel()}
             </Button>
           )}
           

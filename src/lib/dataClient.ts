@@ -5,6 +5,7 @@ import { rateLimit, RATE_LIMITS } from './rateLimiter';
 import { supabase } from '@/integrations/supabase/client';
 
 export type ContractStatus = 'REQUESTED' | 'PENDING_DISBURSAL' | 'ACTIVE' | 'DUE' | 'PENDING_SETTLEMENT' | 'SETTLED' | 'REJECTED';
+export type ContractType = 'MONEY' | 'ITEM' | 'SERVICE';
 
 // UUID generator that works in all contexts (HTTP and HTTPS)
 function generateUUID(): string {
@@ -21,12 +22,28 @@ function generateUUID(): string {
   });
 }
 
+export interface ServiceMilestone {
+  id: string;
+  title: string;
+  due_at: string;
+  amount: number;
+  proof_url?: string | null;
+  approved?: boolean | null; // null=pending, true=approved, false=rejected
+}
+
+export interface LegalUpgrade {
+  enabled: boolean;
+  mode?: 'ESIGN' | 'ESTAMP' | 'BOTH';
+  provider_ref?: string | null;
+  upgraded_at?: string | null;
+}
+
 export interface Contract {
   id: string;
   borrower_id: string;
   lender_id: string;
-  amount: number;
-  due_at: string;
+  amount: number;           // For MONEY; for ITEM/SERVICE may be 0 or total expected
+  due_at: string;           // MONEY=repayment due; ITEM=return due; SERVICE=final milestone due
   reason: string | null;
   attachment_url?: string | null;
   status: ContractStatus;
@@ -34,11 +51,26 @@ export interface Contract {
   updated_at: string;
   borrower?: User;
   lender?: User;
-  disbursal_proof_url?: string | null;
-  repayment_proof_url?: string | null;
+  disbursal_proof_url?: string | null;   // For MONEY disbursal; for ITEM handover proof; for SERVICE kickoff/advance
+  repayment_proof_url?: string | null;   // For MONEY repayment; for ITEM return proof; for SERVICE completion proof
   settlement_pending?: boolean;
   extensions_count?: number;
   extension_pending?: boolean;
+  
+  // NEW: Contract type
+  contract_type: ContractType;
+  
+  // ITEM details
+  item_title?: string | null;
+  item_estimated_value?: number | null;
+  item_condition_photos?: string[] | null;   // base64 data URIs
+  
+  // SERVICE details
+  service_description?: string | null;
+  service_milestones?: ServiceMilestone[] | null;
+  
+  // Legal upgrade
+  legal_upgrade?: LegalUpgrade | null;
 }
 
 
@@ -46,7 +78,7 @@ export interface Review {
   id: string;
   contract_id: string;
   reviewer_id: string;
-  reviewee_id: string;
+  reviewed_user_id: string;
   stars: number;
   text: string | null;
   created_at: string;
@@ -337,7 +369,7 @@ export class MockDataClient {
   async getReviewsForUser(userId: string): Promise<Review[]> {
     this.ensureDemoData();
     const reviews = this.getStore<Review>('reviews');
-    const userReviews = reviews.filter(r => r.reviewer_id === userId || r.reviewee_id === userId);
+    const userReviews = reviews.filter(r => r.reviewer_id === userId || r.reviewed_user_id === userId);
     return userReviews;
   }
 
@@ -346,6 +378,7 @@ export class MockDataClient {
     reviewed_user_id: string;
     rating: number;
     comment: string;
+    contract_id: string;
   }): Promise<Review> {
     this.ensureDemoData();
     const reviews = this.getStore<Review>('reviews');
@@ -356,6 +389,7 @@ export class MockDataClient {
       reviewed_user_id: data.reviewed_user_id,
       rating: data.rating,
       comment: data.comment,
+      contract_id: data.contract_id,
       created_at: new Date().toISOString(),
       resolved: false,
     };
@@ -378,7 +412,7 @@ export class MockDataClient {
     
     // Get all reviews for this borrower
     const reviews = this.getStore<Review>('reviews');
-    const borrowerReviews = reviews.filter(r => r.reviewee_id === borrowerId && r.resolved);
+    const borrowerReviews = reviews.filter(r => r.reviewed_user_id === borrowerId && r.resolved);
     
     // Get all contracts for this borrower
     const contracts = this.getStore<Contract>('contracts');
@@ -965,15 +999,11 @@ class ProductionDataClient {
   }
 
   async updateContract(id: string, data: Partial<Contract>): Promise<Contract | null> {
-    const { data: updatedContract, error } = await supabase
-      .from('contracts')
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-
+    const { data: result, error } = await supabase.functions.invoke('update-contract', {
+      body: { id, ...data, updated_at: new Date().toISOString() }
+    });
     if (error) return null;
-    return updatedContract as Contract;
+    return result as Contract;
   }
 
   async getExtensionsForContract(contractId: string): Promise<Extension[]> {
@@ -1047,6 +1077,7 @@ class ProductionDataClient {
     reviewed_user_id: string;
     rating: number;
     comment: string;
+    contract_id: string;
   }): Promise<Review> {
     const review: Review = {
       id: generateUUID(),
@@ -1054,7 +1085,9 @@ class ProductionDataClient {
       reviewed_user_id: data.reviewed_user_id,
       rating: data.rating,
       comment: data.comment,
+      contract_id: data.contract_id,
       created_at: new Date().toISOString(),
+      resolved: false,
     };
 
     const { data: createdReview, error } = await supabase
@@ -1126,21 +1159,18 @@ class ProductionDataClient {
   // ===== SETTLEMENT & PAYMENT PROOF SYSTEM =====
   async settleContract(contractId: string, proofUrl: string): Promise<Contract | null> {
     try {
-      // Update contract with settlement info
-      const { data: updatedContract, error } = await supabase
-        .from('contracts')
-        .update({
+      // Use the same Supabase function approach as updateContract for consistency
+      const { data: result, error } = await supabase.functions.invoke('update-contract', {
+        body: { 
+          id: contractId, 
           status: 'PENDING_SETTLEMENT',
           repayment_proof_url: proofUrl,
           settlement_pending: true,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', contractId)
-        .select()
-        .single();
-
+        }
+      });
       if (error) throw error;
-      return updatedContract as Contract;
+      return result as Contract;
     } catch (error) {
       console.error('Error settling contract:', error);
       return null;
@@ -1149,26 +1179,23 @@ class ProductionDataClient {
 
   async approveSettlement(contractId: string): Promise<Contract | null> {
     try {
-      const { data: updatedContract, error } = await supabase
-        .from('contracts')
-        .update({
+      const { data: result, error } = await supabase.functions.invoke('update-contract', {
+        body: { 
+          id: contractId, 
           status: 'SETTLED',
           settlement_pending: false,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', contractId)
-        .select()
-        .single();
-
+        }
+      });
       if (error) throw error;
-      
+
       // Update borrower reliability after successful settlement
       const contract = await this.getContractById(contractId);
       if (contract) {
         await this.updateBorrowerReliability(contract.borrower_id, contract.amount);
       }
-      
-      return updatedContract as Contract;
+
+      return result as Contract;
     } catch (error) {
       console.error('Error approving settlement:', error);
       return null;
@@ -1177,20 +1204,17 @@ class ProductionDataClient {
 
   async rejectSettlement(contractId: string): Promise<Contract | null> {
     try {
-      const { data: updatedContract, error } = await supabase
-        .from('contracts')
-        .update({
+      const { data: result, error } = await supabase.functions.invoke('update-contract', {
+        body: { 
+          id: contractId, 
           status: 'ACTIVE',
           settlement_pending: false,
           repayment_proof_url: null,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', contractId)
-        .select()
-        .single();
-
+        }
+      });
       if (error) throw error;
-      return updatedContract as Contract;
+      return result as Contract;
     } catch (error) {
       console.error('Error rejecting settlement:', error);
       return null;

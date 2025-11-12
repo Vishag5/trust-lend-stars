@@ -6,6 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import CreateContract from "./pages/CreateContract";
+import CreateContractType from "./pages/CreateContractType";
+import CreateMoneyContract from "./pages/CreateMoneyContract";
+import CreateItemContract from "./pages/CreateItemContract";
+import CreateServiceContract from "./pages/CreateServiceContract";
 import ContractDetail from "./pages/ContractDetail";
 import Profile from "./pages/Profile";
 import Contracts from "./pages/Contracts";
@@ -35,6 +39,10 @@ const App = () => (
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create-contract" element={<CreateContract />} />
+          <Route path="/create" element={<CreateContractType />} />
+          <Route path="/create/money" element={<CreateMoneyContract />} />
+          <Route path="/create/item" element={<CreateItemContract />} />
+          <Route path="/create/service" element={<CreateServiceContract />} />
           <Route path="/contract/:id" element={<ContractDetail />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/contracts" element={<Contracts />} />

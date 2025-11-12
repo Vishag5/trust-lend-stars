@@ -361,6 +361,7 @@ export default function Dashboard() {
         reviewed_user_id: activeContract.borrower_id,
         rating: rating,
         comment: review || '',
+        contract_id: activeContract.id,
       });
       
       setShowReviewDialog(false);
@@ -743,15 +744,15 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Request Loan Button */}
+        {/* Create Agreement Button */}
         <div className="space-y-3">
           <Button 
             className="w-full" 
             size="lg"
-            onClick={() => navigate('/create-contract')}
+            onClick={() => navigate('/create')}
           >
             <Plus className="mr-2 h-5 w-5" />
-            Request Loan
+            Create Agreement
           </Button>
 
           <div className="grid grid-cols-2 gap-3">

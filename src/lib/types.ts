@@ -47,6 +47,7 @@ export interface Review {
   reviewed_user_id: string;
   rating: number;
   comment: string;
+  contract_id: string;
   created_at: string;
   updated_at?: string;
   resolved?: boolean;
